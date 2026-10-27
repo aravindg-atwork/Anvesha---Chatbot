@@ -52,10 +52,13 @@ export const modelEngine: AnswerEngine = {
       (i) => i >= 0 && i < hits.length,
     );
     const numberOf = new Map(citedIdx.map((i, n) => [i, n + 1]));
-    const out = text.replace(/\[S(\d+)\]/g, (_, d) => {
-      const n = numberOf.get(Number(d) - 1);
-      return n ? `[${n}]` : '';
-    });
+    const out = text
+      .replace(/\[S(\d+)\]/g, (_, d) => {
+        const n = numberOf.get(Number(d) - 1);
+        return n ? `[${n}]` : '';
+      })
+      .replace(/[ \t]+$/gm, '')
+      .trim();
     const citations = citedIdx.map((i, n) => makeCitation(n + 1, hits[i].chunk, bestExcerpt(hits[i].chunk.text, question)));
     const evidence = citations.length ? evidenceFromCoverage(top.coverage, top.matched.length) : 'none';
     return {

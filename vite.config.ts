@@ -7,6 +7,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react(), chatApiPlugin({ apiKey: env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL })],
-    test: { environment: 'node', include: ['src/**/*.test.ts'] },
+    test: { environment: 'node', include: ['src/**/*.test.ts', 'server/**/*.test.ts'] },
   };
 });

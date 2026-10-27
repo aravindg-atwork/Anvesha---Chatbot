@@ -5,3 +5,5 @@ dist
 *.log
 verification/*.png
 *.tsbuildinfo
+test-results
+playwright-report

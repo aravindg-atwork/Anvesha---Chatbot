@@ -11,7 +11,23 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-Other scripts: `npm test` (unit tests), `npm run build` (type check + production build), `npm run preview` (serve the build), `npm run demo-files` (regenerate the sample upload files).
+Other scripts:
+
+| Script | What it does |
+|---|---|
+| `npm test` | Unit tests: domain logic, the server boundary and the model engine with mocked network |
+| `npm run e2e` | Playwright end-to-end tests: the full presenter journey on desktop and a phone layout check. Uses your installed Chrome locally. |
+| `npm run build` | Type check and production build |
+| `npm run preview` | Serve the build |
+| `npm run demo-files` | Regenerate the sample upload files |
+
+CI (`.github/workflows/ci.yml`) runs the build, unit tests and end-to-end tests on every push and pull request.
+
+When an AI key is set, the answer endpoint:
+- accepts requests only from the app's own origin,
+- rate-limits each client to 20 requests a minute,
+- validates request sizes,
+- escapes document and question text inside the prompt's delimiters, so uploaded content can't pose as instructions.
 
 The app works fully offline after `npm install`, with no credentials needed. To use an AI model for answers as well, copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY`. The key is read only by the local server (`server/chatApi.ts`) and is never sent to the browser. With a key set, the **Try** step shows a switch between the offline demo engine and the AI model.
 
