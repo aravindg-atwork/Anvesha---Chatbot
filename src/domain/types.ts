@@ -136,6 +136,8 @@ export const STEPS = ['upload', 'training', 'try', 'review', 'make', 'publish'] 
 export type StepId = (typeof STEPS)[number];
 
 export interface Assistant {
+  pinned?: boolean;
+  collectionId?: string | null;
   id: string;
   orgId: string;
   createdAt: string;
@@ -156,6 +158,7 @@ export interface Assistant {
 }
 
 export interface Organisation {
+  collections?: { id: string; name: string }[];
   id: string;
   name: string;
   createdAt: string;

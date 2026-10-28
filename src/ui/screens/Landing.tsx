@@ -1,212 +1,71 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BookOpen, FileText, MessageCircleQuestion } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowRight, ArrowUpRight, BookOpen, Check, CheckCheck, FileText, Fingerprint, Image, Layers3, Menu, MessageCircle, Plus, ScanText, Search, Sparkles, X } from 'lucide-react';
 import { useAppState } from '../../domain/store';
 import { emptyState, seedSample, instructionsFor } from '../../domain/operations';
-import { viewFromDraft, formatLocator } from '../../domain/knowledge';
+import { viewFromDraft } from '../../domain/knowledge';
 import { answerExtractive } from '../../domain/engine/extractive';
 import { DEMO_QUESTIONS } from '../../demo/vayutech';
-import type { AnswerPayload } from '../../domain/types';
 import { navigate } from '../router';
-import { Button } from '../components/ui';
+import { Brand } from '../App';
 import { AnswerText } from '../chat/ChatPanel';
-import { TopBar } from '../App';
 import { ShaderBackground } from '@/components/ui/dark-mono';
 
-/**
- * Staggered entrance for the landing page. Content is visible by default; only when the script runs
- * and motion is allowed does it start hidden and rise into place as each part enters the view.
- */
-function useReveal() {
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
-    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
-    els.forEach((el, i) => {
-      el.classList.add('reveal-ready');
-      el.style.transitionDelay = `${(i % 4) * 80}ms`;
-    });
-    const io = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add('reveal-in');
-            io.unobserve(e.target);
-          }
-        }),
-      { threshold: 0.15 },
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-}
-
 const EXAMPLES = [
-  { label: 'Emergency leave on probation', q: DEMO_QUESTIONS.emergency },
-  { label: 'Annual leave', q: DEMO_QUESTIONS.supported },
-  { label: 'Something not covered', q: DEMO_QUESTIONS.unsupported },
+  { label: 'Annual leave', question: DEMO_QUESTIONS.supported },
+  { label: 'Emergency leave', question: DEMO_QUESTIONS.emergency },
+  { label: 'Something not covered', question: DEMO_QUESTIONS.unsupported },
 ];
 
-/** Live example: runs the real offline engine against the bundled fictional sample, without saving anything. */
-function InteractiveExample() {
+function ProductWindow() {
   const view = useMemo(() => {
     const { state, assistantId } = seedSample(emptyState(), 'ready');
-    const a = state.assistants.find((x) => x.id === assistantId)!;
-    return viewFromDraft(a, instructionsFor(state, a));
+    const assistant = state.assistants.find((a) => a.id === assistantId)!;
+    return viewFromDraft(assistant, instructionsFor(state, assistant));
   }, []);
-  const [q, setQ] = useState(EXAMPLES[0].q);
-  const answer: AnswerPayload = useMemo(() => answerExtractive(view, q), [view, q]);
-  const c = answer.citations[0];
-  const i = c ? c.excerpt.indexOf(c.highlight) : -1;
-  return (
-    <div className="demo-card" data-ui>
-      <div className="chat-head">
-        <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>
-          <strong>AskHR</strong>
-          <span className="faint small">Example assistant for fictional VayuTech</span>
-        </span>
-      </div>
-      <div style={{ padding: 20 }} className="stack">
-        <div className="row" style={{ '--gap': '8px' } as React.CSSProperties} role="radiogroup" aria-label="Example questions">
-          {EXAMPLES.map((e) => (
-            <button key={e.q} className="chip" role="radio" aria-checked={q === e.q} aria-pressed={q === e.q} onClick={() => setQ(e.q)} style={{ fontSize: '0.92rem', minHeight: 40 }}>
-              {e.label}
-            </button>
-          ))}
-        </div>
-        <div className="stack example-scroll" style={{ '--gap': '14px' } as React.CSSProperties} tabIndex={0} aria-label="Example conversation">
-          <div className="bubble-user" style={{ alignSelf: 'flex-end' }}>
-            {q}
-          </div>
-          <div className="bubble-bot" aria-live="polite">
-            <AnswerText text={answer.text} />
-          </div>
-        </div>
-        {c && (
-          <div className="panel stack" style={{ '--gap': '8px' } as React.CSSProperties}>
-            <span className="ref-label">
-              {c.sourceTitle} · {formatLocator(c.locator)}
-            </span>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem' }}>
-              {i >= 0 ? (
-                <>
-                  {c.excerpt.slice(Math.max(0, i - 80), i).replace(/^\S*\s/, '…')}
-                  <mark>{c.highlight}</mark>
-                </>
-              ) : (
-                c.excerpt.slice(0, 220)
-              )}
-            </p>
-          </div>
-        )}
+  const [selected, setSelected] = useState(0);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const answer = useMemo(() => answerExtractive(view, EXAMPLES[selected].question), [view, selected]);
+  const sources = view.sources.filter((s) => s.status === 'ready').slice(0, 3);
+  return <div className="product-window">
+    <div className="product-window-bar"><div className="window-dots"><i /><i /><i /></div><span>anvesha / your knowledge, connected</span><span className="window-demo"><span /> Interactive sample</span></div>
+    <div className="product-window-body">
+      <aside className="product-window-nav" aria-label="Sample information"><span className="window-org"><span>V</span> VayuTech <small>Sample workspace</small></span><span className="window-nav-active"><Layers3 size={16} /> Knowledge library <span>{view.sources.length}</span></span><span className="window-nav-label">CONNECTED SOURCES</span>{sources.map((s) => <span className="window-source" key={s.id}><FileText size={17} /><span>{s.title}<small>{s.chunks.length} passages · Ready</small></span><Check size={13} /></span>)}<div className="window-local-note"><Fingerprint size={19} /><span>Your knowledge.<br />Always traceable.</span></div></aside>
+      <div className="product-window-chat"><div className="window-chat-heading"><span className="window-assistant"><Sparkles size={20} /></span><div><strong>AskHR</strong><span>Answers from VayuTech’s information</span></div><span className="window-ready"><span /> Ready to help</span></div>
+        <div className="window-conversation"><span className="window-conversation-date">A little clarity, on demand</span><p className="window-user-question">{EXAMPLES[selected].question}</p><div className="window-answer" aria-live="polite"><span className="window-answer-name"><Sparkles size={14} /> AskHR</span><div className="window-answer-scroll"><AnswerText text={answer.text} /></div><div className="window-answer-footer"><span><CheckCheck size={14} /> {answer.citations.length ? 'Sources included' : 'No guessing'}</span>{answer.citations.length > 0 && <button onClick={() => setSourceOpen((v) => !v)} aria-expanded={sourceOpen}><BookOpen size={13} /> {sourceOpen ? 'Hide sources' : 'View sources'}</button>}</div>{sourceOpen && answer.citations[0] && <div className="window-source-excerpt"><strong>{answer.citations[0].sourceTitle}</strong><p>{answer.citations[0].highlight || answer.citations[0].excerpt.slice(0, 220)}</p></div>}</div></div>
+        <div className="window-prompts" aria-label="Example questions">{EXAMPLES.map((example, i) => <button key={example.label} onClick={() => { setSelected(i); setSourceOpen(false); }} aria-pressed={selected === i}>{example.label}<ArrowUpRight size={12} /></button>)}</div><div className="window-composer"><span>Try one of the questions above</span><span><ArrowRight size={17} /></span></div>
       </div>
     </div>
-  );
+  </div>;
 }
+
+const QUESTIONS = [
+  ['What can I give my assistant?', 'Documents, PDFs, Word files, text, images, scanned pages and Q&A spreadsheets. You can also write information directly.'],
+  ['Does “training” change an AI model?', 'No. Anvesha reads, checks and indexes your information so your assistant can retrieve and cite relevant passages. Images and scans are processed with OCR.'],
+  ['Do I need an AI key?', 'You can search and quote your sources locally without one. Conversational explanations use a configured AI provider and require available model quota.'],
+  ['Where does my information live?', 'Your local installation stores workspaces, uploads and conversations on your machine. When you select AI answers, matching sources and conversation context are sent to the configured AI provider.'],
+];
 
 export function Landing() {
   const session = useAppState((s) => s.session);
-  useReveal();
-  return (
-    <div className="page landing-experience">
-      <TopBar>
-        <span className="topbar-spacer" />
-        {session ? (
-          <Button size="sm" onClick={() => navigate('/projects')}>
-            My assistants
-          </Button>
-        ) : (
-          <>
-            <a className="btn btn-ghost btn-sm" href="#/signin">
-              Sign in
-            </a>
-            <a className="btn btn-sm hide-sm" href="#/demo">
-              Explore demo
-            </a>
-          </>
-        )}
-      </TopBar>
-      <main className="container">
-        <section className="hero landing-hero">
-          <div className="landing-shader" aria-hidden><ShaderBackground /></div>
-          <div className="stack" style={{ '--gap': '24px' } as React.CSSProperties}>
-            <h1 className="reveal">Your knowledge. Clear answers.</h1>
-            <p className="lead reveal">
-              Turn your policies, FAQs and guides into an assistant that answers only from them, shows the exact passage behind every answer, and says so when it doesn’t know.
-            </p>
-            <div className="row reveal" style={{ '--gap': '14px' } as React.CSSProperties}>
-              <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} onClick={() => navigate(session ? '/projects' : '/signup')}>
-                Create your assistant
-              </Button>
-              <Button size="lg" onClick={() => navigate('/demo')}>
-                Explore demo
-              </Button>
-            </div>
-          </div>
-          <div className="reveal">
-            <InteractiveExample />
-          </div>
-        </section>
-        <section className="how" aria-labelledby="how-title">
-          <h2 id="how-title" className="how-title reveal">
-            From your documents to a cited answer
-          </h2>
-          <div className="how-grid">
-            <div className="how-step reveal">
-              <h3>Add what you know</h3>
-              <p>Upload files, add questions and answers, or write information in your own words.</p>
-              <div className="frag" data-ui aria-hidden>
-                <div className="frag-row">
-                  <FileText size={18} />
-                  <span className="frag-grow">
-                    <strong>Leave Policy (2025 edition)</strong>
-                    <span className="frag-meta">PDF · 7 passages · Internal only</span>
-                  </span>
-                  <span className="pill pill-ok">Ready</span>
-                </div>
-                <div className="frag-row">
-                  <FileText size={18} />
-                  <span className="frag-grow">
-                    <strong>Benefits Guide</strong>
-                    <span className="frag-meta">DOCX · 4 passages</span>
-                  </span>
-                  <span className="pill pill-warn">Review date passed</span>
-                </div>
-              </div>
-            </div>
-            <div className="how-step reveal">
-              <h3>Try it privately</h3>
-              <p>Ask the questions people really ask, and check every answer against its source.</p>
-              <div className="frag" data-ui aria-hidden>
-                <p className="frag-answer">
-                  Because you’re on probation, casual leave isn’t available to you. <span className="cite">1</span>
-                </p>
-                <p className="frag-source">
-                  <span className="frag-meta">Section 3 · Casual leave</span>
-                  <mark>Employees on probation are not eligible for casual leave.</mark> Requests concerning family emergencies…
-                </p>
-              </div>
-            </div>
-            <div className="how-step reveal">
-              <h3>Make it yours</h3>
-              <p>Shape its tone, greeting and appearance, then open a preview of your assistant.</p>
-              <div className="frag frag-widget" data-ui aria-hidden>
-                <div className="frag-widget-head">
-                  <MessageCircleQuestion size={16} /> AskHR
-                </div>
-                <p className="frag-bubble">Hello! Ask me about VayuTech’s policies and benefits.</p>
-                <span className="frag-chip">How many days of annual leave do I get?</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <footer className="footer">
-        <div className="container spread">
-          <span className="row" style={{ '--gap': '8px' } as React.CSSProperties}>
-            <BookOpen size={15} aria-hidden /> Anvesha · Your knowledge. Clear answers. The example uses a fictional company.
-          </span>
-          <a href="#/demo">Demo launcher</a>
-        </div>
-      </footer>
-    </div>
-  );
+  const [menuOpen, setMenuOpen] = useState(false);
+  const start = () => navigate(session ? '/projects' : '/signup');
+  const scroll = (id: string) => { document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); setMenuOpen(false); };
+  return <div className="launch-page">
+    <header className="launch-nav"><Brand /><nav className={menuOpen ? 'is-open' : ''} aria-label="Main navigation"><button onClick={() => scroll('inside')}>The product</button><button onClick={() => scroll('workflow')}>How it works</button><button onClick={() => scroll('questions')}>Good to know</button></nav><div className="launch-nav-actions"><button className="launch-signin" onClick={() => navigate(session ? '/projects' : '/signin')}>{session ? 'Your workspace' : 'Sign in'}<ArrowUpRight size={15} /></button><button className="journey-button journey-button-ink" onClick={start}>Start building<ArrowRight size={15} /></button><button className="launch-menu" aria-label={menuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>{menuOpen ? <X size={20} /> : <Menu size={20} />}</button></div></header>
+    <main>
+      <section className="launch-hero"><div className="launch-hero-grid" aria-hidden /><span className="launch-eyebrow"><span /> A home for what you know <ArrowUpRight size={13} /></span><h1>Great answers.<br /><em>Already in your files.</em></h1><p>The documents. The scanned notes. The answers in someone’s head.<br className="launch-desktop-break" /> Bring them together in an assistant that makes knowledge useful.</p><div className="launch-hero-actions"><button className="journey-button journey-button-ink" onClick={start}>Create your assistant<ArrowRight size={17} /></button><button className="launch-text-action" onClick={() => navigate('/demo')}><span><ArrowUpRight size={15} /></span> Explore the live demo</button></div><span className="launch-hero-note"><Check size={13} /> Your sources. Your workspace. Your way.</span>
+        <div className="launch-stage" id="inside"><div className="launch-stage-label"><span>MEET YOUR KNOWLEDGE’S NEW HOME</span><ArrowDown size={15} /></div><ProductWindow /><span className="launch-stage-caption">A fictional workspace. A real source-based answer. Try the questions above.</span></div>
+      </section>
+      <section className="launch-formats" aria-label="Supported source formats"><span>A place for every piece<br /><strong>of the bigger picture.</strong></span><div><FileText size={21} /><span>Documents<small>PDF · Word · Text</small></span></div><div><Image size={21} /><span>Images & scans<small>Readable with OCR</small></span></div><div><MessageCircle size={21} /><span>Questions & answers<small>Write it or import a CSV</small></span></div></section>
+      <section className="launch-workflow" id="workflow"><div className="launch-section-intro"><span className="journey-kicker">LESS SEARCHING. MORE UNDERSTANDING.</span><h2>From scattered information<br />to a shared understanding.</h2><p>Keep the complexity behind the scenes.<br />A clear path gets you from your first file to your first answer.</p></div><div className="launch-steps">
+        <article><span className="launch-step-number">01 / COLLECT</span><div className="launch-file-art"><div><FileText /><span>Employee handbook.pdf<small>Document connected</small></span><Check size={14} /></div><div><ScanText /><span>A page of possibilities.jpg<small>Image connected</small></span><Check size={14} /></div><div className="launch-file-add"><Plus size={17} /><span>Room for everything you know</span></div></div><h3>Start with what you have.</h3><p>Upload your files, add useful Q&A, or simply write it down. All of it belongs together.</p></article>
+        <article><span className="launch-step-number">02 / CONNECT</span><div className="launch-process-art"><div><Search size={20} /><span>Reading between the files.</span></div><span><Check size={13} /> Read & parse</span><span><Check size={13} /> Prepare passages</span><span><Check size={13} /> Build a searchable library</span></div><h3>Let your knowledge connect.</h3><p>Watch real processing turn documents and images into passages your assistant can find.</p></article>
+        <article><span className="launch-step-number">03 / UNDERSTAND</span><div className="launch-citation-art"><span><Sparkles size={14} /> An answer with a place to begin.</span><p>“Employees receive <mark>18 days of annual leave</mark> each year.”</p><small><BookOpen size={13} /> Sample policy · Source passage</small></div><h3>Ask. Understand. Go deeper.</h3><p>Test your assistant, open its sources, and ask the follow-up that helps everything click.</p></article>
+      </div></section>
+      <section className="launch-principles"><div className="launch-principle-art"><ShaderBackground /><div className="launch-principle-glass"><Fingerprint size={37} strokeWidth={1} /><span>THE SOURCE IS THE STARTING POINT.</span><h3>Good answers<br />have roots.</h3><div><span /><span /><span /></div></div></div><div className="launch-principle-copy"><span className="journey-kicker">CLARITY YOU CAN LOOK INTO.</span><h2>A useful answer.<br />An open book.</h2><p>Your assistant’s answer is just the beginning. See the exact passage behind it, understand what it can and can’t support, and improve the information at the source.</p><ul><li><Check size={16} /><div><strong>Follow the source.</strong><span>Open citations instead of taking an answer on faith.</span></div></li><li><Check size={16} /><div><strong>Give each idea its own space.</strong><span>Separate workspaces, organized projects and a place for every source.</span></div></li><li><Check size={16} /><div><strong>Make it feel like yours.</strong><span>Choose the name, tone, greeting and appearance.</span></div></li></ul><button className="launch-text-action" onClick={start}>Build something useful<ArrowRight size={17} /></button></div></section>
+      <section className="launch-faq" id="questions"><div><span className="journey-kicker">A FEW THINGS, CLEARLY.</span><h2>Good questions.<br />Straight answers.</h2><p>Before your knowledge gets a new home.</p></div><div>{QUESTIONS.map(([q, a]) => <details key={q}><summary>{q}<Plus size={18} /></summary><p>{a}</p></details>)}</div></section>
+      <section className="launch-final"><span className="journey-kicker">THERE’S SOMETHING GOOD IN THOSE FILES.</span><h2>Let’s give it<br /><em>a voice.</em></h2><button className="journey-button journey-button-gold" onClick={start}>Start your workspace<ArrowUpRight size={18} /></button><span>Build from your own information. Start at your own pace.</span></section>
+    </main>
+    <footer className="launch-footer"><Brand /><span>For the knowledge you already have.</span><button onClick={() => navigate('/demo')}>Explore demo<ArrowUpRight size={14} /></button></footer>
+  </div>;
 }

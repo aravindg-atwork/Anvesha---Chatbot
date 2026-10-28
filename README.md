@@ -196,7 +196,13 @@ Shortcuts for presenting: `#/demo/ready` opens a fresh ready-to-test sample on *
 
 Other launcher options: **Ready-to-test sample** (opens on Try) and **Published sample** (opens on Overview). **Reset sample** removes only the VayuTech sample.
 
-## Data and privacy (prototype)
+## Interface and project organization
+
+The entry journey includes a source-backed interactive landing preview, account screens, workspace setup and a project studio. Projects support persistent pins and workspace-specific collections, drag-to-collection organization, search, sorting, and grid/list/board views. Board stages reflect actual project progress. Press Ctrl/Cmd+K to find projects and workspaces, or `/` to focus project search.
+
+Reusable components live in `src/components/ui` (imported as `@/components/ui`), following the existing shadcn-compatible `components.json`. TypeScript and Tailwind are already configured. The new journey styles are in `src/styles/journey.css`; existing editor and chat styles remain in `app.css` and `product.css`. The supplied Tool Call Card is adapted for React 18 and displays real worker activity on the processing screen, including timestamps, expandable JSON, copy controls and retries. These are processing summaries, not model reasoning.
+
+## Data and privacy (offline demo)
 
 Everything lives in this browser's `localStorage`:
 - the extracted text (uploaded files themselves are not kept),

@@ -15,6 +15,24 @@ function project() {
 }
 
 describe('workspace and projects', () => {
+  it('keeps organization separate from knowledge and rejects collections from another workspace', () => {
+    const { state, id } = project();
+    const trained = op.markTrained(op.addSampleDocuments(state, id), id);
+    const orgId = get(trained, id).orgId;
+    const collection = op.addCollection(trained, orgId, ' Research ');
+    expect(op.addCollection(collection.state, orgId, 'research').collectionId).toBe(collection.collectionId);
+    expect(op.addCollection(collection.state, orgId, 'research').state.orgs[0].collections).toHaveLength(1);
+    const arranged = op.arrangeProject(collection.state, id, { pinned: true, collectionId: collection.collectionId });
+    expect(get(arranged, id).pinned).toBe(true);
+    expect(get(arranged, id).draftRevision).toBe(get(trained, id).draftRevision);
+    expect(get(arranged, id).draft).toEqual(get(trained, id).draft);
+    expect(op.needsTraining(get(arranged, id))).toBe(false);
+    const other = op.createWorkspace(arranged, 'Another workspace');
+    const foreign = op.addCollection(other.state, other.orgId, 'Private');
+    expect(op.arrangeProject(foreign.state, id, { collectionId: foreign.collectionId })).toBe(foreign.state);
+    expect(get(op.arrangeProject(arranged, id, { collectionId: null }), id).collectionId).toBeNull();
+    expect(get(trained, id).pinned).toBeUndefined();
+  });
   it('creates a workspace without a project, and a project with a suggested identity', () => {
     const { state, orgId } = op.createWorkspace(op.emptyState(), '  VayuTech ');
     expect(state.orgs[0].name).toBe('VayuTech');

@@ -5,6 +5,7 @@ import '@fontsource-variable/geist';
 import './styles/tailwind.css';
 import './styles/app.css';
 import './styles/product.css';
+import './styles/journey.css';
 import { App } from './ui/App';
 import { initializeSession } from './domain/store';
 

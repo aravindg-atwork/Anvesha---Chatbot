@@ -122,6 +122,25 @@ export function createWorkspace(s: AppState, name: string): { state: AppState; o
   return { state: next, orgId: org.id };
 }
 
+/** Organization-only changes do not alter the assistant's knowledge or publication. */
+export function arrangeProject(s: AppState, id: string, patch: { pinned?: boolean; collectionId?: string | null }): AppState {
+  const a = s.assistants.find((item) => item.id === id);
+  if (!a) return s;
+  if (patch.collectionId && !s.orgs.find((o) => o.id === a.orgId)?.collections?.some((c) => c.id === patch.collectionId)) return s;
+  return withAssistant(s, id, (assistant) => Object.assign(assistant, patch));
+}
+
+export function addCollection(s: AppState, orgId: string, name: string): { state: AppState; collectionId: string } {
+  const next = clone(s);
+  const org = next.orgs.find((o) => o.id === orgId);
+  if (!org || !name.trim()) return { state: s, collectionId: '' };
+  const existing = org.collections?.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
+  if (existing) return { state: s, collectionId: existing.id };
+  const collectionId = uid('collection');
+  org.collections = [...(org.collections ?? []), { id: collectionId, name: name.trim().slice(0, 40) }];
+  return { state: next, collectionId };
+}
+
 /** A project is one assistant. Name and purpose come from the owner's words, editable later. */
 export function createProject(
   s: AppState,

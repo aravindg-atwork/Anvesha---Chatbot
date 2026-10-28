@@ -35,7 +35,7 @@ test('offline demo: create a workspace and project, and upload real files with t
   await page.getByRole('button', { name: /Start from scratch/ }).click();
 
   // Workspace
-  await expect(page.getByRole('heading', { name: 'What’s the name of your organisation?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Create your.*knowledge space/ })).toBeVisible();
   await page.getByRole('textbox', { name: 'Workspace name' }).fill('Greenfield College');
   await page.getByRole('button', { name: 'Create workspace' }).click();
 
@@ -82,7 +82,7 @@ test('offline demo: create a workspace and project, and upload real files with t
   // Projects list shows the project and its progress.
   await page.getByRole('link', { name: 'Projects' }).click();
   await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Admissions Helper/ })).toContainText('Step 1 of 6');
+  await expect(page.locator('.studio-project-open').filter({ hasText: 'Admissions Helper' })).toContainText('Step 1 of 6');
 });
 
 test('presenter story from scratch: sample documents, training, cited answer, improve, make, publish, isolate draft, unpublish', async ({ page, context }) => {

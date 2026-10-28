@@ -8,6 +8,13 @@ async function noHorizontalScroll(page: Page) {
 test('key screens fit a phone without horizontal scrolling or tiny text', async ({ page }) => {
   await page.goto('/');
   await noHorizontalScroll(page);
+  await page.getByRole('button', { name: 'Emergency leave', exact: true }).click();
+  await expect(page.locator('.window-user-question')).toContainText('probation');
+  await page.getByRole('button', { name: 'Something not covered', exact: true }).click();
+  await expect(page.locator('.window-answer-footer')).toContainText('No guessing');
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Good to know', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open navigation', exact: true })).toHaveAttribute('aria-expanded', 'false');
   const bodySize = await page.evaluate(() => parseFloat(getComputedStyle(document.body).fontSize));
   expect(bodySize).toBeGreaterThanOrEqual(16);
 

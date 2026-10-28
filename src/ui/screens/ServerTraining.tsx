@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, ChevronLeft, FileSearch, Layers3, Loader2, RefreshCw, ScanText, SearchCheck } from 'lucide-react';
-import { ThinkingTool } from '@/components/ui/thinking-tool';
+import { ArrowRight, CheckCircle2, ChevronLeft, FileSearch, Layers3, RefreshCw, ScanText, SearchCheck } from 'lucide-react';
+import { ToolCallCard, ToolCallGroup } from '@/components/ui/tool-call-card';
 import { api } from '../../lib/api';
 import { dispatch, flushRemote } from '../../domain/store';
 import * as op from '../../domain/operations';
@@ -51,24 +51,17 @@ export function ServerTraining({ assistant: a, stepNumber, nextLabel, onNext, on
       <div className="training-jobs card card-pad stack">
         <div className="training-jobs-heading"><h2>Agent activity</h2><span className="muted small">{running ? 'Live updates' : 'Latest run'}</span></div>
         {visible.length === 0 && <p className="muted">Starting the knowledge coordinator…</p>}
-        {visible.map((job) => {
+        {visible.filter((job) => job.status === 'queued').map((job) => <div className="training-job spread" key={job.id}><strong>{job.kind === 'index' ? 'Search indexing' : a.draft.sources.find((s) => s.id === job.source_id)?.title || 'Document processing'}</strong><span className="muted small">Queued · Waiting for the worker</span></div>)}
+        {visible.some((job) => job.status !== 'queued') && <ToolCallGroup defaultOpen runningLabel="Preparing your knowledge…">{visible.filter((job) => job.status !== 'queued').map((job) => {
           const source = a.draft.sources.find((s) => s.id === job.source_id);
-          const pending = job.status === 'running' || job.status === 'queued';
-          return <div key={job.id} className="training-job stack" style={{ '--gap': '12px' } as React.CSSProperties}>
-            <div className="spread"><strong>{job.kind === 'index' ? 'Search indexing' : source?.title || 'Document processing'}</strong>
-              <span className={`pill ${job.status === 'complete' ? 'pill-ok' : job.status === 'failed' ? 'pill-danger' : 'pill-accent'}`}>
-                {pending ? <Loader2 size={14} className="spin" /> : job.status === 'complete' ? <CheckCircle2 size={14} /> : null} {job.stage}
-              </span></div>
-            <progress aria-label={`${source?.title || 'Search indexing'} progress`} value={job.progress} max={100} style={{ width: '100%', accentColor: 'var(--accent)' }} />
-            <span className="muted small">{job.events.at(-1)?.message || 'Waiting for the worker'}</span>
-            {job.error && <Notice tone="danger">{job.error}</Notice>}
-            <div className="job-thinking" aria-label="Processing activity"><ThinkingTool state={pending ? 'thinking' : 'thought'} content={job.events.length ? job.events.map((event) => `${new Date(event.at).toLocaleTimeString()} · ${event.agent}\n${event.message}`).join('\n\n') : 'Waiting for the knowledge coordinator to pick up this job.'} /></div>
-            {job.status === 'failed' && job.source_id && <Button size="sm" onClick={async () => {
+          const first = job.events[0]?.at;
+          const last = job.events.at(-1)?.at;
+          return <ToolCallCard key={job.id} name={job.kind === 'index' ? 'index_knowledge' : 'prepare_source'} summary={job.kind === 'index' ? `Search indexing · ${job.stage}` : `${source?.title || 'Document processing'} · ${job.stage}`} icon={job.kind === 'index' ? <SearchCheck /> : <FileSearch />} status={job.status === 'running' ? 'running' : job.status === 'complete' ? 'success' : 'error'} startedAt={first ? Date.parse(first) : undefined} duration={first && last ? Math.max(0, Date.parse(last) - Date.parse(first)) : undefined} args={job.kind === 'index' ? { project: a.draft.name, sources: a.draft.sources.length } : { source: source?.title || 'Removed source', format: source?.fileType }} result={{ stage: job.stage, progress: job.progress, activity: job.events }} error={job.error || (job.status === 'cancelled' ? 'This source was removed.' : undefined)} onRetry={job.status === 'failed' ? async () => {
+              if (!job.source_id) { await start(); return; }
               try { await api(`/api/projects/${a.id}/sources/${job.source_id}/retry`, { method: 'POST' }); await processing.refresh(); }
               catch (e) { setError(e instanceof Error ? e.message : 'Retry failed.'); }
-            }}>Retry this source</Button>}
-          </div>;
-        })}
+            } : undefined} />;
+        })}</ToolCallGroup>}
       </div>
       <p className="muted small">Images and scanned pages take longer because each needs OCR. The first indexing run downloads a local embedding model. You can leave this screen and return; jobs continue on the backend. This prepares source knowledge and does not retrain model weights.</p>
       <div><Button icon={<RefreshCw size={16} />} disabled={running} onClick={() => void start()}>{ready ? 'Rebuild search index' : 'Prepare / retry indexing'}</Button></div>

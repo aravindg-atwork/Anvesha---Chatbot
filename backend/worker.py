@@ -116,12 +116,13 @@ class Worker:
                 db.execute('BEGIN IMMEDIATE')
                 row = db.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created_at,rowid LIMIT 1").fetchone()
                 if row:
-                    db.execute("UPDATE jobs SET status='running',error=NULL WHERE id=?", (row['id'],))
+                    db.execute("UPDATE jobs SET status='running',error=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?", (row['id'],))
             if not row:
                 self.stop.wait(0.5)
                 continue
             job = dict(row)
             try:
+                report(job['id'], 'Coordinator', 0, 'Starting knowledge processing.')
                 asyncio.run(run_job(job))
                 with connect() as db:
                     db.execute("UPDATE jobs SET status='complete',progress=100,stage='Complete',updated_at=CURRENT_TIMESTAMP WHERE id=?", (job['id'],))

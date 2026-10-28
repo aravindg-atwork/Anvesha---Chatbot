@@ -181,12 +181,12 @@ function StepNav({ a, current }: { a: Assistant; current: StepId | null }) {
 type ShellSection = StepId | 'overview' | 'conversations' | 'settings';
 
 /** Framed sheet: one ivory frame (sidebar + top bar), the work on a white sheet. */
-export function AppFrame({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
+export function AppFrame({ sidebar, topbar, children, className = '' }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const path = usePath();
   useEffect(() => setOpen(false), [path]);
   return (
-    <div className="page">
+    <div className={`page ${className}`}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
