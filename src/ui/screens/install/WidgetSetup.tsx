@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Code2, MessageCircle, X } from 'lucide-react';
-import type { Assistant, WidgetSettings } from '../../../domain/types';
-import { dispatch } from '../../../domain/store';
-import * as op from '../../../domain/operations';
-import { Button, CopyBlock, Field, Modal, Notice, Segmented } from '../../components/ui';
+import type { Assistant } from '../../../domain/types';
+import { Button, CopyBlock, Modal, Notice } from '../../components/ui';
+import { Avatar, projectPath } from '../../App';
+import { navigate } from '../../router';
 import { PublishedChat } from './PublishedChat';
 
-const COLOURS = ['#1d3a5f', '#2e6a4a', '#7a3b2e', '#4b3f72', '#23211e', '#0f6d7a'];
 const SCRIPT_HOST = 'https://cdn.anvesha.example';
 
 export function widgetSnippets(a: Assistant) {
@@ -77,7 +76,6 @@ export function WidgetSetup({ a, orgName }: { a: Assistant; orgName: string }) {
   const w = a.share.widget;
   const [open, setOpen] = useState(true);
   const [instructions, setInstructions] = useState(false);
-  const set = (p: Partial<WidgetSettings>) => dispatch((s) => op.updateShare(s, a.id, { widget: { ...w, ...p } }));
   const side = w.position === 'right' ? { right: 20 } : { left: 20 };
 
   return (
@@ -119,54 +117,24 @@ export function WidgetSetup({ a, orgName }: { a: Assistant; orgName: string }) {
         <p className="faint small">Live preview. Answers come from published version {a.published?.version}, exactly as visitors would see them.</p>
       </div>
 
-      <div className="stack" style={{ '--gap': '22px' } as React.CSSProperties}>
-        <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-          <span className="field-label" id="colour-label">
-            Colour
-          </span>
-          <div className="swatches" role="radiogroup" aria-labelledby="colour-label">
-            {COLOURS.map((c) => (
-              <button key={c} className="swatch" role="radio" aria-checked={w.color === c} aria-label={c} style={{ background: c }} onClick={() => set({ color: c })} />
-            ))}
-          </div>
-        </div>
-        <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-          <span className="field-label">Style</span>
-          <Segmented
-            label="Style"
-            value={w.mode}
-            onChange={(mode) => set({ mode })}
-            options={[
-              { value: 'floating', label: 'Floating button' },
-              { value: 'inline', label: 'Inside the page' },
-            ]}
-          />
-        </div>
-        {w.mode === 'floating' && (
-          <div className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-            <span className="field-label">Position</span>
-            <Segmented
-              label="Position"
-              value={w.position}
-              onChange={(position) => set({ position })}
-              options={[
-                { value: 'left', label: 'Bottom left' },
-                { value: 'right', label: 'Bottom right' },
-              ]}
-            />
-          </div>
-        )}
-        <Field label="Greeting" hint="Leave empty to use the assistant’s greeting.">
-          {(id, h) => (
-            <textarea id={id} aria-describedby={h} className="textarea" rows={2} value={w.greeting} placeholder={a.published?.greeting} onChange={(e) => set({ greeting: e.target.value })} />
-          )}
-        </Field>
-        <p className="faint small">Appearance changes apply straight away. They don’t change what the assistant knows.</p>
+      <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
+        <h3>Put it on your website</h3>
+        <ol className="install-steps">
+          <li>Get the installation code.</li>
+          <li>Paste it into your website, or send it to whoever manages your site.</li>
+          <li>Your assistant appears with the look you chose in Make.</li>
+        </ol>
         <div>
           <Button variant="primary" icon={<Code2 size={18} />} onClick={() => setInstructions(true)}>
             Get installation instructions
           </Button>
         </div>
+        <p className="muted small">
+          Want a different colour, avatar or position?{' '}
+          <button className="link-btn" onClick={() => navigate(projectPath(a.id, 'make'))}>
+            Change it in Make
+          </button>
+        </p>
       </div>
       {instructions && <InstallModal a={a} onClose={() => setInstructions(false)} />}
     </div>
@@ -176,7 +144,10 @@ export function WidgetSetup({ a, orgName }: { a: Assistant; orgName: string }) {
 function WidgetHead({ a, onClose }: { a: Assistant; onClose?: () => void }) {
   return (
     <div className="widget-head" style={{ background: a.share.widget.color }}>
-      <strong>{a.published?.name ?? a.draft.name}</strong>
+      <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>
+        <Avatar a={a} size={28} inverse />
+        <strong>{a.published?.name ?? a.draft.name}</strong>
+      </span>
       {onClose && (
         <button className="icon-btn" style={{ color: '#fff', width: 36, height: 36 }} aria-label="Close chat" onClick={onClose}>
           <X size={18} />

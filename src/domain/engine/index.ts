@@ -73,7 +73,7 @@ export const modelEngine: AnswerEngine = {
   },
 };
 
-export async function fetchModelStatus(): Promise<{ modelAvailable: boolean; model: string | null }> {
+export async function fetchModelStatus(): Promise<{ modelAvailable: boolean; model: string | null; connectionState?: string; modelError?: string | null }> {
   try {
     const r = await fetch('/api/status');
     if (!r.ok) return { modelAvailable: false, model: null };

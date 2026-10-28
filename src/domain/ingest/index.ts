@@ -2,7 +2,7 @@ import type { Chunk, FileType, Source } from '../types';
 import { sha256 } from '../../lib/hash';
 import { chunkPlainText } from './txt';
 
-export const ACCEPTED = '.pdf,.docx,.txt,.md,.csv';
+export const ACCEPTED = '.pdf,.docx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp';
 export const MAX_BYTES = 15 * 1024 * 1024;
 
 export function fileTypeOf(name: string): FileType | null {
@@ -11,6 +11,7 @@ export function fileTypeOf(name: string): FileType | null {
   if (ext === 'docx') return 'DOCX';
   if (ext === 'txt' || ext === 'md') return 'TXT';
   if (ext === 'csv') return 'CSV';
+  if (ext && ['png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'bmp'].includes(ext)) return 'Image';
   return null;
 }
 
@@ -52,6 +53,7 @@ export interface Extraction {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export async function extractFile(type: FileType, data: ArrayBuffer, sourceId: string): Promise<Extraction> {
+  if (type === 'Image') return { chunks: [], note: '', attention: 'Image OCR requires a signed-in account and the local Python backend. Sign in to process this image.' };
   if (type === 'TXT') {
     const text = new TextDecoder('utf-8').decode(data);
     if (!text.trim()) return { chunks: [], note: '', attention: 'This file has no readable text.' };

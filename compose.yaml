@@ -1,0 +1,34 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GOOGLE_MODEL: ${GOOGLE_MODEL:-gemini-3.8-flash}
+      QDRANT_URL: http://qdrant:6333
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-eng}
+      COOKIE_SECURE: "false"
+    volumes:
+      - app_data:/data
+      - embedding_models:/models
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=35)"]
+      interval: 30s
+      timeout: 40s
+      start_period: 60s
+      retries: 3
+volumes:
+  qdrant_data:
+  app_data:
+  embedding_models:

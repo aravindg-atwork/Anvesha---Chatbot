@@ -1,12 +1,15 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource-variable/newsreader';
-import '@fontsource-variable/figtree';
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/geist';
+import './styles/tailwind.css';
 import './styles/app.css';
+import './styles/product.css';
 import { App } from './ui/App';
+import { initializeSession } from './domain/store';
 
-createRoot(document.getElementById('root')!).render(
+void initializeSession().finally(() => createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
-);
+));

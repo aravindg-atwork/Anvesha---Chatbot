@@ -22,15 +22,15 @@ export function DemoLauncher() {
   const open = (kind: 'empty' | 'ready' | 'published') => {
     if (kind === 'empty') {
       dispatch((s) => ({ ...s, session: s.session ?? { kind: 'demo' } }));
-      navigate('/start/new');
+      navigate('/workspace/new');
       return;
     }
     const { assistantId } = dispatchWith((s) => op.seedSample(s, kind));
-    navigate(kind === 'ready' ? `/a/${assistantId}/setup/try` : `/a/${assistantId}`);
+    navigate(kind === 'ready' ? `/p/${assistantId}/try` : `/p/${assistantId}`);
   };
 
   const options = [
-    { kind: 'empty' as const, icon: <Building2 size={22} />, t: 'Empty new organisation', d: 'Start from the organisation name and go through all five steps.' },
+    { kind: 'empty' as const, icon: <Building2 size={22} />, t: 'Start from scratch', d: 'Sign-in skipped. Create a workspace and a project, then go through all six steps. Use “VayuTech sample documents” on Upload.' },
     { kind: 'ready' as const, icon: <MessageSquareText size={22} />, t: 'Ready-to-test sample', d: 'VayuTech’s AskHR with documents added. Opens on “Try”.' },
     { kind: 'published' as const, icon: <Radio size={22} />, t: 'Published sample', d: 'AskHR already published, ready to try in the widget.' },
   ];
@@ -45,7 +45,6 @@ export function DemoLauncher() {
       <TopBar />
       <main className="container narrow screen stack" style={{ '--gap': '32px' } as React.CSSProperties}>
         <div className="stack" style={{ '--gap': '8px' } as React.CSSProperties}>
-          <span className="eyebrow">Demo launcher</span>
           <h1>Choose where to start</h1>
           <p className="lead">Demo mode needs no account or internet connection. Sample data is fictional and stays in this browser.</p>
         </div>

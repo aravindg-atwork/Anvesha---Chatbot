@@ -2,9 +2,92 @@
 
 *Your knowledge. Clear answers.*
 
-Anvesha lets an organisation build an assistant from its own documents, FAQs and written information, test answers against highlighted sources, and publish it to a website widget or an API. This repository is a presentation-ready web prototype.
+UI setup and supplied component integration: see [docs/ui-setup.md](docs/ui-setup.md) for Tailwind, shadcn paths, ThinkingTool, the mesh shader and glass theme.
 
-## Run it
+Anvesha is a local knowledge-assistant product built with React, a Python API, Google ADK, SQLite and Qdrant. Create an account, create workspaces and named projects, upload documents and images, watch real processing jobs, then test cited answers against your sources. External widget/API publishing remains a preview.
+
+## Run the local product with Docker (recommended)
+
+Start Docker Desktop, then run from this directory:
+
+```powershell
+docker compose up -d --build
+```
+
+Open **http://127.0.0.1:8000/#/signup**. Create your own account; there are no default credentials. Open the app consistently on this hostname so the session cookie is retained.
+
+1. Create a workspace, then a project with its own name and purpose.
+2. Upload PDF, DOCX, TXT/Markdown, CSV, PNG, JPG, WEBP, TIFF or BMP files, up to 15 MB each. CSVs in the UI have a Q&A import preview. Written information and approved Q&A are also saved and indexed.
+3. Open **Training** while uploads process. The ADK knowledge coordinator runs parsing/OCR and passage preparation; a search-indexing job embeds passages locally and saves them in Qdrant. The screen shows persisted job stages, page activity, failures and retry controls. Larger documents take real processing time. Jobs continue when you navigate away and resume after backend restarts.
+4. When the index is ready, continue to **Try**. Questions retrieve passages from Qdrant, filtered to your account, project and current source revision. Review citations and rate answers. Changed sources require reindexing before they can answer.
+5. Sign out and sign in again, or restart Docker: your workspaces, projects, uploads, jobs and conversations are retained.
+
+No Google key is needed for local OCR, parsing, embeddings, Qdrant or cited source quotes. The first indexing run downloads `BAAI/bge-small-en-v1.5` and caches it in a Docker volume; allow internet access for this initial model download. This embedding model is primarily for English text. For Gemini-written answers, create `.env` from `.env.example`, set `GOOGLE_API_KEY`, then run `docker compose up -d app` to apply the environment. Select **AI model** in Try. Keys stay on the server. Status indicates configuration, not verified provider connectivity.
+
+Tesseract is included in the app image. English OCR is the default; set `OCR_LANGUAGES=eng+hin` in `.env` to use the included Hindi data too, and recreate the app container. OCR can misread low-quality scans: inspect extracted passages. PDFs are limited to 250 pages, animated/multipage images to 50 frames, and extracted text to 3 MB per file.
+
+The preparation pipeline uses ADK custom agents under a sequential coordinator. Its parser/OCR/curator/indexer stages execute local code and need no LLM key. Signed-in chat uses LangChain prompt/model chains and Gemini structured output: one pass writes a source-grounded answer, and another reviews its support. **Training here means preparing retrieval knowledge, not updating model weights.**
+
+AI mode never silently falls back to quotes. Missing credentials, disabled APIs, key restrictions, unavailable models and exhausted credits produce explicit errors; use **Check AI connection** in Try to test the configured model. Source quotes are a separate, explicitly selected mode and cannot simplify or explain text. AI generation requires a permitted key, model access and available Gemini quota/credits. Each supported AI answer normally uses two model calls (writing and source-support review).
+
+Chat sends the question, owner instructions, up to eight recent saved conversation messages and relevant current passages to Gemini. Generic follow-ups such as “explain this in simple English” reuse still-current cited passages rather than searching the vague follow-up alone. Each generated statement must cite an exact source quote; invalid references and rejected support reviews are withheld. Three suggested questions help continue the conversation. Citation checks and an AI review reduce unsupported answers but cannot guarantee factual correctness or repair incorrect OCR.
+
+## Storage and operations
+
+| Store | What it contains | Docker volume |
+|---|---|---|
+| SQLite (`/data/anvesha.sqlite3`, WAL mode) | Accounts, scrypt password hashes, hashed session tokens, workspaces, projects, extracted passages, jobs, conversations | `app_data` |
+| Files (`/data/uploads`) | Original uploads and parsed intermediates | `app_data` |
+| Qdrant | Local passage embeddings, with account/project/revision filters | `qdrant_data` |
+| Embedding cache | Downloaded ONNX model | `embedding_models` |
+
+`docker compose stop` stops services without deleting data. `docker compose up -d` resumes them. Avoid `docker compose down -v` unless you intend to erase the volumes. For a consistent backup, stop the app and snapshot all three volumes, including the SQLite WAL files. Source/project removal hides data from current retrieval; original files and old vector revisions are retained for local recovery. Account deletion and storage garbage collection are not implemented yet.
+
+Useful checks:
+
+```powershell
+docker compose ps
+docker compose logs -f app
+# Database and Qdrant connectivity:
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+```
+
+Both published ports bind to localhost. This is a single-machine pilot with real authentication and per-account ownership, not an internet deployment: email verification, password recovery, workspace invitations, multi-worker coordination and external publishing are not implemented. Run one app worker against the SQLite database. The current UI's Publish step and authorised-publication labels remain previews; the signed-in Upload → Training → Try flow is the supported product path.
+
+## Develop without rebuilding containers
+
+Python 3.11+ and Node 22.12+ are required. On Windows PowerShell:
+
+```powershell
+docker compose up -d qdrant
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+# Stop the Docker app before running a host backend on the same port:
+docker compose stop app
+npm install
+npm run api
+```
+
+In a second terminal run `npm run dev`. `.env.example` sets `ANVESHA_API_URL=http://127.0.0.1:8000`, so Vite forwards `/api` to Python. The host backend uses `./data` for SQLite and files. For host OCR, install Tesseract and set `TESSERACT_CMD` if necessary; the Docker backend already includes it. Never prefix secret settings with `VITE_`.
+
+## Validate
+
+```powershell
+python -m unittest discover -s backend -p test_*.py
+npm test
+npm run build
+# With Docker services running:
+python scripts/check-local-backend.py
+npm run e2e:local
+```
+
+The backend tests cover authentication, revocation, ownership, revision conflicts, upload validation, source integrity, ADK job execution and retrieval. `check-local-backend.py` exercises actual PNG/scanned-PDF OCR, TXT/DOCX parsing and Qdrant embeddings without mocks; `--restart` also checks persistence across a Docker app restart. It creates a clearly named test workspace/account. The local Playwright test covers account creation, workspace/project creation, uploads, training, citations, reload and sign-in. Real Gemini generation requires your own key and quota.
+
+## Offline demo reference
+
+The sections below describe the retained browser-only presenter demo, accessed at `#/demo`. Its sample data and simulated publishing are separate from signed-in backend workspaces. `npm run e2e` checks that demo; `npm run e2e:local` checks the real product against Docker. To run only the offline demo:
 
 ```bash
 npm install
@@ -71,40 +154,47 @@ The app works fully offline after `npm install`, with no credentials needed. To 
 
 **Evidence labels** (Strong / Partial / No supporting source) come from a word-match check between the question and the cited passage. The UI states that this is not proof of correctness.
 
+## The flow
+
+**Sign in → Create workspace → Your projects → Project.** Each project is one assistant and has six steps. You can return to any step at any time.
+
+| Step | What happens |
+|---|---|
+| **1 Upload** | Upload files (PDF, Word, text, Q&A CSV), add questions and answers, or write information |
+| **2 Training** | Anvesha reads and indexes the information, lists the topics it found and flags conflicts and outdated sources. No AI model is trained, and the screen says so. |
+| **3 Try** | Private test chat with cited sources, evidence labels and feedback |
+| **4 Review** | Purpose, language, tone (friendly, formal or concise), contact for more help, custom instructions, and answers marked "not helpful" |
+| **5 Make** | Name, avatar, colour, greeting, starter questions and widget style, with a live preview |
+| **6 Publish** | Audience, channel, a review of what's included, publishing, then widget or API installation |
+
+After the first publish, the project also has an **Overview**, **Conversations** and **Settings** (versions and data).
+
 ## Five-minute presenter walkthrough
 
-Open `http://localhost:5173/#/demo` (the presenter launcher).
+Open `http://localhost:5173/#/demo` (the presenter launcher) and choose **Start from scratch**.
 
-1. **Create** (≈1 min). Choose *Empty new organisation*, type "Greenfield College", then pick *College admissions* and *Suggest a name and purpose* → **Continue**. Upload `VayuTech-Employee-Handbook.pdf` and `Scanned-Notice.pdf` from the launcher's sample files.
-   - Expected: the handbook shows **Ready**, and *Preview* shows "PDF page 3 · printed page "1"".
-   - Expected: the scanned file shows **Needs attention**, with an explanation.
-2. **Switch to the story.** Go back to the launcher and choose *Ready-to-test sample* (VayuTech AskHR, which opens on **Try**).
-3. **Ask:** *"I am on probation and my mother is hospitalised. Can I take three days' leave?"*
-   - Expected: the answer acknowledges the emergency, explains that casual leave isn't available on probation, says HR reviews family emergencies individually with no guarantee, and neither approves nor rejects.
-4. **Inspect the citation.** Click **View sources**.
-   - Expected: *VayuTech Leave Policy (2025 edition) · Section: 3. Casual leave*, with the required passage highlighted.
-5. **Improve the draft.** Click 👎, then *Change how it helps*. Enter the contact "the HR Care desk at hrcare@vayutech.example or extension 2040".
-6. **Retest.** Go to **Try** and ask again.
-   - Expected: the old answer is marked "Answered using an earlier draft", and the new answer names the HR Care desk.
-7. **More examples.**
-   - "How many days of annual leave do I get?" → 18 days, strong support.
-   - "How much leave do I get?" → asks which kind.
-   - "Does VayuTech pay for a gym membership?" → honest "couldn't find" plus help contact.
-   - "How many casual leave days do I get?" → shows both 8 (2025) and 12 (2023) as conflicting.
-   - Optional: under **Add knowledge**, choose *Use the 2025 version* and ask again → 8 days only.
-8. **Publish.** **Continue to sharing** → *Only authorised users* (note the "simulated" warning) → *On my website* → review → **Publish**.
-   - Expected: "Version 1 is published… not on your website until it is installed".
-9. **Try the widget.** Click the emergency question in the website preview.
-   - Expected: the same answer from version 1, with no owner labels. *Get installation instructions* shows the div/JS snippets and a developer handoff note.
-10. **Edit the draft.** Go to the assistant's home → *Update information* → *How it helps*, and change the extension to 2041.
-    - Expected: the banner says people still get version 1.
-    - **Open assistant** and ask again → still "extension 2040".
-11. **Republish.** Use *Review and publish* → **Publish changes** (version 2). The public page now says 2041.
-12. **Review conversations.** On the home page, choose **Review conversations** to see real counts.
-    - If you asked an unanswered question on the public page, use *Write an answer*. Saving requires explicit approval.
-13. **Unpublish.** Click **Unpublish now** → confirm. The open public page shows "This assistant isn't available right now" and the composer is disabled.
+1. **Workspace and project** (≈30 s). Type "VayuTech" → **Create workspace**. In *New project*, pick *Employee questions* → **Create project**. The name AskHR is suggested.
+2. **Upload.** Click *Use VayuTech sample documents* (demo only).
+   - Optional: click **Choose files** and add `VayuTech-Employee-Handbook.pdf` from `public/sample-files`. *Preview* shows "PDF page 3 · printed page "1"".
+3. **Training.** Watch each source being prepared.
+   - Expected: topics such as *Casual leave* and *Health insurance*, and a *Casual leave allowance* conflict between the 2023 and 2025 editions.
+4. **Try.** Ask: *"I am on probation and my mother is hospitalised. Can I take three days' leave?"*
+   - Expected: empathy; casual leave isn't available on probation; HR reviews family emergencies with no guarantee; neither approves nor rejects.
+   - Click **View sources**: *Section: 3. Casual leave*, with the required passage highlighted.
+5. **Improve.** Click 👎 → *Change how it helps*. Review lists the flagged answer. Enter "the HR Care desk at hrcare@vayutech.example or extension 2040".
+6. **Retest.** Go back to **Try** and ask again.
+   - Expected: the old answer is marked "Answered using an earlier draft", and the new one names the HR Care desk.
+   - Also try "How many casual leave days do I get?" → both 8 (2025) and 12 (2023) are shown as conflicting.
+7. **Review.** Choose the **Formal** tone.
+8. **Make.** Pick a colour (including coral) and an avatar. The preview and project header update instantly.
+9. **Publish.** *Only authorised users* (note the "simulated" warning) → *On my website* → **Publish**.
+   - Ask the emergency question in the website preview. Expected: version 1, formal wording, no owner labels.
+10. **Edit, then republish.** In **Review**, change the extension to 2041. The banner says people still see version 1, and **Open assistant** still answers "2040". Click *Review and publish* → **Publish changes**, and the public page now says 2041.
+11. **Conversations, then unpublish.** Open **Conversations** to see real counts and turn unanswered questions into approved answers. Then **Overview** → **Unpublish now**: the public page stops answering.
 
-Reset quickly with the launcher's **Reset sample**. It removes only the VayuTech sample.
+Shortcuts for presenting: `#/demo/ready` opens a fresh ready-to-test sample on **Try**, and `#/demo/published` opens a fresh published sample on **Overview**. Add a step to jump straight to it, for example `#/demo/ready/make`.
+
+Other launcher options: **Ready-to-test sample** (opens on Try) and **Published sample** (opens on Overview). **Reset sample** removes only the VayuTech sample.
 
 ## Data and privacy (prototype)
 

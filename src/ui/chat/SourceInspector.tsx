@@ -79,7 +79,7 @@ export function SourceInspector({
           </div>
         )}
         <div className="ref-line">
-          <span className="eyebrow">
+          <span className="label">
             Source {c.n} · {c.fileType === 'Written' ? (c.locator.kind === 'faq' ? 'Question and answer' : 'Written') : c.fileType}
           </span>
           <strong style={{ fontSize: '1.1rem', overflowWrap: 'anywhere' }}>{c.sourceTitle}</strong>
@@ -93,7 +93,7 @@ export function SourceInspector({
           </div>
         )}
         <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>
+          <div className="label" style={{ marginBottom: 8 }}>
             Supporting passage
           </div>
           <div className="excerpt" tabIndex={0}>

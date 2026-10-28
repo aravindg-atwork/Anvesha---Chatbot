@@ -16,9 +16,13 @@ test('key screens fit a phone without horizontal scrolling or tiny text', async 
   await expect(page.getByRole('heading', { name: 'Try a question your users might ask.' })).toBeVisible();
   await noHorizontalScroll(page);
 
-  // The step indicator fits without its own scrollbar.
-  const steps = await page.locator('.steps').evaluate((el) => ({ s: el.scrollWidth, c: el.clientWidth }));
-  expect(steps.s).toBeLessThanOrEqual(steps.c);
+  // On a phone the six steps live in the menu: it opens, shows every step, and closes on navigation.
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  const steps = page.getByRole('navigation', { name: 'Project steps' });
+  await expect(steps).toBeVisible();
+  await expect(steps.getByRole('button')).toHaveCount(6);
+  await steps.getByRole('button', { name: /^Try/ }).click();
+  await expect(page.getByRole('button', { name: 'Open menu' })).toHaveAttribute('aria-expanded', 'false');
 
   // Sources open as a sheet on phones.
   await page.getByRole('button', { name: /How many days of annual leave/ }).click();

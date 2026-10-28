@@ -1,4 +1,4 @@
-import type { Assistant, Chunk, Conflict, FaqEntry, Handover, Locator, Snapshot, Source } from './types';
+import type { Assistant, Chunk, Conflict, FaqEntry, Handover, Locator, Snapshot, Source, Tone } from './types';
 
 /** Everything an answer engine may read. Built from either the editable draft or a published snapshot. */
 export interface KnowledgeView {
@@ -6,6 +6,7 @@ export interface KnowledgeView {
   assistantName: string;
   instructions: string;
   handover: Handover;
+  tone: Tone;
   sources: Source[];
   faqs: FaqEntry[];
   conflicts: Conflict[];
@@ -65,6 +66,7 @@ export function viewFromDraft(a: Assistant, instructions: string): KnowledgeView
     assistantName: a.draft.name,
     instructions,
     handover: a.draft.handover,
+    tone: a.draft.tone,
     sources: a.draft.sources,
     faqs: a.draft.faqs,
     conflicts: a.draft.conflicts,
@@ -79,6 +81,7 @@ export function viewFromSnapshot(s: Snapshot, isSample: boolean): KnowledgeView 
     assistantName: s.name,
     instructions: s.instructions,
     handover: s.handover,
+    tone: s.tone,
     sources: s.sources,
     faqs: s.faqs,
     conflicts: s.conflicts,

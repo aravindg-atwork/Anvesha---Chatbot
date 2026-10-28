@@ -293,3 +293,52 @@ export function formatDate(iso: string | undefined, opts: Intl.DateTimeFormatOpt
 export function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * A button that opens the browser's file chooser. It is a native <label> wrapping a visually
+ * hidden (not display:none) file input, so it works without script-triggered clicks and in every
+ * browser. The input stays keyboard-focusable; the label shows its focus ring.
+ */
+export function FilePicker({
+  accept,
+  multiple,
+  onFiles,
+  variant = 'secondary',
+  size,
+  icon,
+  children,
+  className = '',
+  style,
+  testId,
+}: {
+  accept: string;
+  multiple?: boolean;
+  onFiles: (files: File[]) => void;
+  variant?: BtnVariant;
+  size?: 'sm' | 'lg';
+  icon?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+  testId?: string;
+}) {
+  const v = variant === 'secondary' ? '' : `btn-${variant}`;
+  return (
+    <label className={`btn file-picker ${v} ${size ? `btn-${size}` : ''} ${className}`} style={style}>
+      <input
+        type="file"
+        className="file-picker-input"
+        accept={accept}
+        multiple={multiple}
+        data-testid={testId}
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = '';
+          if (files.length) onFiles(files);
+        }}
+      />
+      {icon}
+      {children}
+    </label>
+  );
+}

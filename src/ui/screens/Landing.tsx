@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ArrowRight, BookOpen, FileText, MessageCircleQuestion, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, BookOpen, FileText, MessageCircleQuestion } from 'lucide-react';
 import { useAppState } from '../../domain/store';
 import { emptyState, seedSample, instructionsFor } from '../../domain/operations';
 import { viewFromDraft, formatLocator } from '../../domain/knowledge';
@@ -10,6 +10,34 @@ import { navigate } from '../router';
 import { Button } from '../components/ui';
 import { AnswerText } from '../chat/ChatPanel';
 import { TopBar } from '../App';
+import { ShaderBackground } from '@/components/ui/dark-mono';
+
+/**
+ * Staggered entrance for the landing page. Content is visible by default; only when the script runs
+ * and motion is allowed does it start hidden and rise into place as each part enters the view.
+ */
+function useReveal() {
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
+    els.forEach((el, i) => {
+      el.classList.add('reveal-ready');
+      el.style.transitionDelay = `${(i % 4) * 80}ms`;
+    });
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('reveal-in');
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.15 },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+}
 
 const EXAMPLES = [
   { label: 'Emergency leave on probation', q: DEMO_QUESTIONS.emergency },
@@ -29,7 +57,7 @@ function InteractiveExample() {
   const c = answer.citations[0];
   const i = c ? c.excerpt.indexOf(c.highlight) : -1;
   return (
-    <div className="demo-card">
+    <div className="demo-card" data-ui>
       <div className="chat-head">
         <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>
           <strong>AskHR</strong>
@@ -76,12 +104,13 @@ function InteractiveExample() {
 
 export function Landing() {
   const session = useAppState((s) => s.session);
+  useReveal();
   return (
-    <div className="page">
+    <div className="page landing-experience">
       <TopBar>
         <span className="topbar-spacer" />
         {session ? (
-          <Button size="sm" onClick={() => navigate('/start')}>
+          <Button size="sm" onClick={() => navigate('/projects')}>
             My assistants
           </Button>
         ) : (
@@ -96,17 +125,15 @@ export function Landing() {
         )}
       </TopBar>
       <main className="container">
-        <section className="hero">
+        <section className="hero landing-hero">
+          <div className="landing-shader" aria-hidden><ShaderBackground /></div>
           <div className="stack" style={{ '--gap': '24px' } as React.CSSProperties}>
-            <span className="eyebrow">Your knowledge. Clear answers.</span>
-            <h1>
-              An assistant that answers from <em>your</em> documents — and shows where.
-            </h1>
-            <p className="lead">
-              Add your policies, FAQs and guides. Anvesha answers questions from that information only, points to the exact passage, and tells people when it doesn’t know.
+            <h1 className="reveal">Your knowledge. Clear answers.</h1>
+            <p className="lead reveal">
+              Turn your policies, FAQs and guides into an assistant that answers only from them, shows the exact passage behind every answer, and says so when it doesn’t know.
             </p>
-            <div className="row" style={{ '--gap': '14px' } as React.CSSProperties}>
-              <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} onClick={() => navigate(session ? '/start/new' : '/signup')}>
+            <div className="row reveal" style={{ '--gap': '14px' } as React.CSSProperties}>
+              <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} onClick={() => navigate(session ? '/projects' : '/signup')}>
                 Create your assistant
               </Button>
               <Button size="lg" onClick={() => navigate('/demo')}>
@@ -114,26 +141,68 @@ export function Landing() {
               </Button>
             </div>
           </div>
-          <InteractiveExample />
+          <div className="reveal">
+            <InteractiveExample />
+          </div>
         </section>
-        <section className="how" aria-label="How it works">
-          {[
-            { icon: <FileText size={20} />, t: 'Add what you know', d: 'Upload files, add questions and answers, or write information in your own words.' },
-            { icon: <MessageCircleQuestion size={20} />, t: 'Try it privately', d: 'Ask the questions people really ask. Check every answer against its source.' },
-            { icon: <Share2 size={20} />, t: 'Share when ready', d: 'Publish to your website or app. Your edits stay private until you publish again.' },
-          ].map((x, i) => (
-            <div key={x.t} className="stack" style={{ '--gap': '10px' } as React.CSSProperties}>
-              <span className="how-num">{i + 1}</span>
-              <h3>{x.t}</h3>
-              <p className="muted">{x.d}</p>
+        <section className="how" aria-labelledby="how-title">
+          <h2 id="how-title" className="how-title reveal">
+            From your documents to a cited answer
+          </h2>
+          <div className="how-grid">
+            <div className="how-step reveal">
+              <h3>Add what you know</h3>
+              <p>Upload files, add questions and answers, or write information in your own words.</p>
+              <div className="frag" data-ui aria-hidden>
+                <div className="frag-row">
+                  <FileText size={18} />
+                  <span className="frag-grow">
+                    <strong>Leave Policy (2025 edition)</strong>
+                    <span className="frag-meta">PDF · 7 passages · Internal only</span>
+                  </span>
+                  <span className="pill pill-ok">Ready</span>
+                </div>
+                <div className="frag-row">
+                  <FileText size={18} />
+                  <span className="frag-grow">
+                    <strong>Benefits Guide</strong>
+                    <span className="frag-meta">DOCX · 4 passages</span>
+                  </span>
+                  <span className="pill pill-warn">Review date passed</span>
+                </div>
+              </div>
             </div>
-          ))}
+            <div className="how-step reveal">
+              <h3>Try it privately</h3>
+              <p>Ask the questions people really ask, and check every answer against its source.</p>
+              <div className="frag" data-ui aria-hidden>
+                <p className="frag-answer">
+                  Because you’re on probation, casual leave isn’t available to you. <span className="cite">1</span>
+                </p>
+                <p className="frag-source">
+                  <span className="frag-meta">Section 3 · Casual leave</span>
+                  <mark>Employees on probation are not eligible for casual leave.</mark> Requests concerning family emergencies…
+                </p>
+              </div>
+            </div>
+            <div className="how-step reveal">
+              <h3>Make it yours</h3>
+              <p>Shape its tone, greeting and appearance, then open a preview of your assistant.</p>
+              <div className="frag frag-widget" data-ui aria-hidden>
+                <div className="frag-widget-head">
+                  <MessageCircleQuestion size={16} /> AskHR
+                </div>
+                <p className="frag-bubble">Hello! Ask me about VayuTech’s policies and benefits.</p>
+                <span className="frag-chip">How many days of annual leave do I get?</span>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
       <footer className="footer">
         <div className="container spread">
           <span className="row" style={{ '--gap': '8px' } as React.CSSProperties}>
-            <BookOpen size={15} aria-hidden /> Anvesha prototype. The example uses a fictional company.
+            <BookOpen size={15} aria-hidden /> Anvesha · Your knowledge. Clear answers. The example uses a fictional company.
           </span>
           <a href="#/demo">Demo launcher</a>
         </div>

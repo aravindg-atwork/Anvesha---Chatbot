@@ -32,7 +32,7 @@ export const EVIDENCE_TEXT: Record<EvidenceLevel, { label: string; basis: string
 };
 
 export const EVIDENCE_CAVEAT =
-  'This label comes from a word-match check between the question and the cited passage. It is not a guarantee that the answer is correct.';
+  'This label reflects source matching, not independent fact-checking. Review the cited passages to verify the answer.';
 
 export function evidenceFromCoverage(coverage: number, matched: number): EvidenceLevel {
   if (coverage >= 0.6 && matched >= 2) return 'strong';

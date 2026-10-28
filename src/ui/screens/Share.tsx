@@ -5,8 +5,7 @@ import { dispatch, useAppState } from '../../domain/store';
 import * as op from '../../domain/operations';
 import { hasUnpublishedChanges, planPublication } from '../../domain/publish';
 import { Button, Confirm, Notice, formatDateTime, toast } from '../components/ui';
-import type { StepProps } from '../App';
-import { navigate } from '../router';
+import { StepHeading, type StepProps } from '../App';
 import { WidgetSetup } from './install/WidgetSetup';
 import { ApiSetup } from './install/ApiSetup';
 
@@ -26,7 +25,7 @@ function Choice({ selected, onClick, icon, title, desc }: { selected: boolean; o
   );
 }
 
-export function ShareStep({ assistant: a, mode, onBack }: StepProps) {
+export function ShareStep({ assistant: a, stepNumber, onNext, onBack }: StepProps) {
   const live = a.status === 'live';
   const [phase, setPhase] = useState<Phase>(() =>
     live && !hasUnpublishedChanges(a) ? 'install' : !a.share.audience ? 'audience' : !a.share.channel ? 'channel' : 'review',
@@ -45,10 +44,7 @@ export function ShareStep({ assistant: a, mode, onBack }: StepProps) {
 
   return (
     <div className="screen narrow" style={{ margin: '0 auto', maxWidth: phase === 'install' ? 1120 : undefined }}>
-      <div className="screen-head">
-        {mode === 'setup' && <span className="eyebrow">Step 5 of 5</span>}
-        <h1>Choose how people will use your assistant.</h1>
-      </div>
+      <StepHeading step="publish" n={stepNumber} title="Choose how people will use your assistant." />
 
       {phase === 'audience' && (
         <div className="stack" style={{ '--gap': '20px' } as React.CSSProperties}>
@@ -216,8 +212,8 @@ export function ShareStep({ assistant: a, mode, onBack }: StepProps) {
       )}
 
       <div className="action-bar">
-        <button className="back-link" onClick={phase === 'install' && mode === 'update' ? onBack : back}>
-          <ChevronLeft size={18} /> {phase === 'install' && mode === 'update' ? 'Done' : 'Back'}
+        <button className="back-link" onClick={phase === 'install' ? onBack : back}>
+          <ChevronLeft size={18} /> Back
         </button>
         {phase === 'audience' && (
           <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} disabled={!a.share.audience} onClick={() => setPhase('channel')}>
@@ -244,9 +240,9 @@ export function ShareStep({ assistant: a, mode, onBack }: StepProps) {
             {live ? 'Publish changes' : a.status === 'unpublished' ? 'Publish again' : 'Publish'}
           </Button>
         )}
-        {phase === 'install' && mode === 'setup' && (
-          <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} onClick={() => navigate(`/a/${a.id}`)}>
-            Go to your assistant’s home
+        {phase === 'install' && (
+          <Button variant="primary" size="lg" iconEnd={<ArrowRight size={20} />} onClick={onNext}>
+            Go to overview
           </Button>
         )}
       </div>

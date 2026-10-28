@@ -1,19 +1,31 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { CheckCircle2, ChevronLeft, FlaskConical } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  BarChart3,
+  Check,
+  ChevronLeft,
+  ExternalLink,
+  FlaskConical,
+  LayoutDashboard,
+  Menu,
+  Settings,
+} from 'lucide-react';
 import { STEPS, type Assistant, type Organisation, type StepId } from '../domain/types';
-import { useAppState, storageNotices, dispatch } from '../domain/store';
+import { useAppState, storageNotices, dispatch, dispatchWith } from '../domain/store';
 import * as op from '../domain/operations';
 import { hasUnpublishedChanges } from '../domain/publish';
 import { Redirect, match, navigate, usePath } from './router';
 import { BrandMark, Button, Notice, Toasts } from './components/ui';
+import { Avatar } from './components/avatar';
+export { Avatar, AvatarGlyph, AVATAR_KEYS } from './components/avatar';
 import { Landing } from './screens/Landing';
 import { AuthScreen } from './screens/Auth';
-import { StartScreen } from './screens/Start';
+import { WorkspaceScreen, ProjectsScreen } from './screens/Projects';
 import { DemoLauncher } from './screens/DemoLauncher';
-import { DescribeStep } from './screens/Describe';
 import { KnowledgeStep } from './screens/Knowledge';
-import { ReviewStep } from './screens/Review';
+import { TrainingStep } from './screens/Training';
 import { TryStep } from './screens/Try';
+import { ReviewStep } from './screens/Review';
+import { MakeStep } from './screens/Make';
 import { ShareStep } from './screens/Share';
 import { HomeScreen } from './screens/Home';
 import { ConversationsScreen } from './screens/Conversations';
@@ -21,20 +33,34 @@ import { SettingsScreen } from './screens/Settings';
 import { PublicChat } from './screens/PublicChat';
 
 export const STEP_LABEL: Record<StepId, string> = {
-  describe: 'Describe',
-  knowledge: 'Add knowledge',
-  review: 'Review',
+  upload: 'Upload',
+  training: 'Training',
   try: 'Try',
-  share: 'Share',
+  review: 'Review',
+  make: 'Make',
+  publish: 'Publish',
+};
+
+export const STEP_HINT: Record<StepId, string> = {
+  upload: 'Add the information it should know',
+  training: 'Anvesha prepares your information',
+  try: 'Ask questions and check the answers',
+  review: 'Decide how it behaves',
+  make: 'Choose how it looks',
+  publish: 'Share it with people',
 };
 
 export interface StepProps {
   assistant: Assistant;
   org: Organisation;
-  mode: 'setup' | 'update';
   onNext: () => void;
   onBack: () => void;
+  /** 1-based position, for "Step 2 of 6". */
+  stepNumber: number;
+  nextLabel?: string;
 }
+
+export const projectPath = (id: string, step?: StepId | 'conversations' | 'settings') => (step ? `/p/${id}/${step}` : `/p/${id}`);
 
 export function Brand({ to = '/' }: { to?: string }) {
   return (
@@ -45,14 +71,17 @@ export function Brand({ to = '/' }: { to?: string }) {
   );
 }
 
-function DemoStrip() {
+export function DemoStrip() {
   const session = useAppState((s) => s.session);
   if (session?.kind !== 'demo') return null;
   return (
     <div className="demo-strip" role="note">
       <div className="container">
         <span className="row" style={{ '--gap': '8px' } as React.CSSProperties}>
-          <FlaskConical size={15} aria-hidden /> Demo mode: no real sign-in. Everything stays in this browser.
+          <FlaskConical size={15} aria-hidden />
+          <span>
+            Demo mode<span className="hide-sm">: no real sign-in. Everything stays in this browser.</span>
+          </span>
         </span>
         <a href="#/demo">Demo launcher</a>
       </div>
@@ -82,7 +111,7 @@ export function TopBar({ children, home = '/' }: { children?: ReactNode; home?: 
   );
 }
 
-function StorageBanner() {
+export function StorageBanner() {
   const [notice, setNotice] = useState(storageNotices.loadNotice());
   const saveError = useAppState(() => storageNotices.saveError());
   if (!notice && !saveError) return null;
@@ -108,159 +137,197 @@ function StorageBanner() {
   );
 }
 
-// ── Guided setup ────────────────────────────────────────
+export function StatusPill({ a }: { a: Assistant }) {
+  if (a.status === 'live')
+    return (
+      <span className="pill pill-ok">
+        <span className="dot" aria-hidden /> Live · v{a.published?.version}
+      </span>
+    );
+  if (a.status === 'unpublished') return <span className="pill pill-warn">Unpublished</span>;
+  return <span className="pill">Draft</span>;
+}
 
-function StepIndicator({ a, current, onGo }: { a: Assistant; current: StepId; onGo: (s: StepId) => void }) {
+
+// ── Project shell: one place for every step ───────────────────────────────
+
+function StepNav({ a, current }: { a: Assistant; current: StepId | null }) {
   return (
-    <nav aria-label="Setup progress" style={{ minWidth: 0, flex: 1, display: 'flex', justifyContent: 'center' }}>
-      <ol className="steps">
-        {STEPS.map((s, i) => {
-          const done = a.completedSteps.includes(s) && s !== current;
-          const reachable = done || a.completedSteps.includes(STEPS[i - 1]) || i === 0;
-          return (
-            <li key={s} className="row" style={{ '--gap': '4px', flexWrap: 'nowrap' } as React.CSSProperties}>
-              {i > 0 && <span className="step-sep" aria-hidden />}
-              <button
-                className={`step-btn ${s === current ? 'current' : ''} ${done || (reachable && s !== current) ? 'done' : ''}`}
-                aria-current={s === current ? 'step' : undefined}
-                disabled={!reachable || s === current}
-                onClick={() => onGo(s)}
-              >
-                <span className="step-num">{done ? <CheckCircle2 size={14} /> : i + 1}</span>
-                <span className="step-label">{STEP_LABEL[s]}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+    <nav aria-label="Project steps" className="side-group">
+      <span className="side-group-label">Build</span>
+      {STEPS.map((s, i) => {
+        const done = a.completedSteps.includes(s);
+        const isCurrent = s === current;
+        return (
+          <button
+            key={s}
+            className={`side-row ${isCurrent ? 'current' : ''} ${done ? 'done' : ''}`}
+            aria-current={isCurrent ? 'step' : undefined}
+            title={STEP_HINT[s]}
+            onClick={() => navigate(projectPath(a.id, s))}
+          >
+            <span className="side-num" aria-hidden>
+              {done && !isCurrent ? <Check size={12} strokeWidth={3} /> : i + 1}
+            </span>
+            {STEP_LABEL[s]}
+            {done && !isCurrent && <span className="sr-only">(done)</span>}
+          </button>
+        );
+      })}
     </nav>
   );
 }
 
-function SaveState() {
+type ShellSection = StepId | 'overview' | 'conversations' | 'settings';
+
+/** Framed sheet: one ivory frame (sidebar + top bar), the work on a white sheet. */
+export function AppFrame({ sidebar, topbar, children }: { sidebar: ReactNode; topbar: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const path = usePath();
+  useEffect(() => setOpen(false), [path]);
   return (
-    <span className="save-state hide-sm" aria-live="polite">
-      <CheckCircle2 size={15} aria-hidden /> Saved automatically
-    </span>
+    <div className="page">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <DemoStrip />
+      <div className={`app-frame ${open ? 'menu-open' : ''}`}>
+        <aside
+          className="sidebar"
+          aria-label="Navigation"
+          onClick={(e) => {
+            // Any choice in the menu closes it, including the page you are already on.
+            if ((e.target as HTMLElement).closest('a, button')) setOpen(false);
+          }}
+        >
+          {sidebar}
+        </aside>
+        {open && <div className="menu-scrim" onClick={() => setOpen(false)} aria-hidden />}
+        <header className="app-topbar">
+          <button className="icon-btn menu-toggle" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
+            <Menu size={20} />
+          </button>
+          {topbar}
+        </header>
+        <div className="app-sheet">{children}</div>
+      </div>
+      <Toasts />
+    </div>
   );
 }
 
-function Setup({ a, org, step }: { a: Assistant; org: Organisation; step: StepId }) {
+export function ProjectShell({ a, org, current, children }: { a: Assistant; org: Organisation; current: ShellSection; children: ReactNode }) {
+  const step = (STEPS as readonly string[]).includes(current) ? (current as StepId) : null;
+  const manage: { id: ShellSection; label: string; icon: ReactNode; show: boolean }[] = [
+    { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={17} />, show: a.history.length > 0 },
+    { id: 'conversations', label: 'Conversations', icon: <BarChart3 size={17} />, show: true },
+    { id: 'settings', label: 'Settings', icon: <Settings size={17} />, show: true },
+  ];
+  return (
+    <AppFrame
+      sidebar={
+        <>
+          <Brand to="/projects" />
+          <a className="side-row" href="#/projects">
+            <ChevronLeft size={16} aria-hidden /> All projects
+          </a>
+          <div className="side-project">
+            <Avatar a={a} size={36} />
+            <div style={{ minWidth: 0 }}>
+              <span className="side-project-name">{a.draft.name || 'New project'}</span>
+              <span className="small muted">{org.name}</span>
+            </div>
+          </div>
+          <StepNav a={a} current={step} />
+          <nav className="side-group" aria-label="Manage">
+            <span className="side-group-label">Manage</span>
+            {manage
+              .filter((m) => m.show)
+              .map((m) => (
+                <button
+                  key={m.id}
+                  className={`side-row ${current === m.id ? 'current' : ''}`}
+                  aria-current={current === m.id ? 'page' : undefined}
+                  onClick={() => navigate(m.id === 'overview' ? projectPath(a.id) : projectPath(a.id, m.id as 'conversations' | 'settings'))}
+                >
+                  {m.icon}
+                  {m.label}
+                </button>
+              ))}
+          </nav>
+        </>
+      }
+      topbar={
+        <>
+          <nav aria-label="Breadcrumb" className="crumbs">
+            <a href="#/projects">{org.name}</a>
+            <span aria-hidden>/</span>
+            <span>{a.draft.name || 'New project'}</span>
+          </nav>
+          <StatusPill a={a} />
+          <span className="topbar-spacer" />
+          {a.status === 'live' && current !== 'overview' && (
+            <a className="btn btn-sm hide-sm" href={`#/chat/${a.publicId}`} target="_blank" rel="noreferrer">
+              Open assistant <ExternalLink size={15} />
+            </a>
+          )}
+        </>
+      }
+    >
+      {hasUnpublishedChanges(a) && a.status === 'live' && current !== 'publish' && (
+        <div className="banner-wrap">
+          <div className="banner" style={{ padding: '12px 40px' }}>
+            <span>
+              Your changes are saved as a draft. People still see <strong>version {a.published!.version}</strong> until you publish.
+            </span>
+            <Button size="sm" variant="primary" onClick={() => navigate(projectPath(a.id, 'publish'))}>
+              Review and publish
+            </Button>
+          </div>
+        </div>
+      )}
+      <StorageBanner />
+      <main id="main" className="content" key={current}>
+        {children}
+      </main>
+    </AppFrame>
+  );
+}
+
+function StepPage({ a, org, step }: { a: Assistant; org: Organisation; step: StepId }) {
   useEffect(() => {
     if (a.currentStep !== step) dispatch((s) => op.goToStep(s, a.id, step));
   }, [a.id, a.currentStep, step]);
   const i = STEPS.indexOf(step);
-  const go = (s: StepId) => navigate(`/a/${a.id}/setup/${s}`);
   const props: StepProps = {
     assistant: a,
     org,
-    mode: 'setup',
+    stepNumber: i + 1,
+    nextLabel: i < STEPS.length - 1 ? `Continue to ${STEP_LABEL[STEPS[i + 1]]}` : undefined,
     onNext: () => {
       dispatch((s) => op.completeStep(s, a.id, step));
-      if (i < STEPS.length - 1) go(STEPS[i + 1]);
+      navigate(i < STEPS.length - 1 ? projectPath(a.id, STEPS[i + 1]) : projectPath(a.id));
     },
-    onBack: () => (i === 0 ? navigate('/start') : go(STEPS[i - 1])),
+    onBack: () => navigate(i === 0 ? '/projects' : projectPath(a.id, STEPS[i - 1])),
   };
   return (
-    <div className="page">
-      <DemoStrip />
-      <TopBar home="/start">
-        <StepIndicator a={a} current={step} onGo={go} />
-        <SaveState />
-      </TopBar>
-      <StorageBanner />
-      <main className="container" key={step}>
-        <StepBody step={step} props={props} />
-      </main>
-      <Toasts />
-    </div>
+    <ProjectShell a={a} org={org} current={step}>
+      {step === 'upload' && <KnowledgeStep {...props} />}
+      {step === 'training' && <TrainingStep {...props} />}
+      {step === 'try' && <TryStep {...props} />}
+      {step === 'review' && <ReviewStep {...props} />}
+      {step === 'make' && <MakeStep {...props} />}
+      {step === 'publish' && <ShareStep {...props} />}
+    </ProjectShell>
   );
 }
 
-function StepBody({ step, props }: { step: StepId; props: StepProps }) {
-  switch (step) {
-    case 'describe':
-      return <DescribeStep {...props} />;
-    case 'knowledge':
-      return <KnowledgeStep {...props} />;
-    case 'review':
-      return <ReviewStep {...props} />;
-    case 'try':
-      return <TryStep {...props} />;
-    case 'share':
-      return <ShareStep {...props} />;
-  }
-}
-
-// ── After launch ────────────────────────────────────────
-
-const EDIT_SECTIONS: { id: string; step: StepId; label: string }[] = [
-  { id: 'knowledge', step: 'knowledge', label: 'Information' },
-  { id: 'behaviour', step: 'review', label: 'How it helps' },
-  { id: 'try', step: 'try', label: 'Try draft' },
-  { id: 'share', step: 'share', label: 'Publish & install' },
-];
-
-export function UnpublishedBanner({ a }: { a: Assistant }) {
-  if (!hasUnpublishedChanges(a) || a.status !== 'live') return null;
+export function StepHeading({ title, intro }: { step: StepId; n: number; title: string; intro?: ReactNode }) {
   return (
-    <div className="banner-wrap">
-      <div className="container banner">
-        <span>
-          You have draft changes that people can’t see yet. They still get <strong>version {a.published!.version}</strong>.
-        </span>
-        <Button size="sm" variant="primary" onClick={() => navigate(`/a/${a.id}/edit/share`)}>
-          Review and publish
-        </Button>
-      </div>
+    <div className="screen-head">
+      <h1>{title}</h1>
+      {intro && <p className="lead">{intro}</p>}
     </div>
-  );
-}
-
-export function OwnerShell({ a, children, back }: { a: Assistant; children: ReactNode; back?: { label: string; to: string } }) {
-  return (
-    <div className="page">
-      <DemoStrip />
-      <TopBar home={`/a/${a.id}`}>
-        <span className="topbar-spacer" />
-        <a className="btn btn-ghost btn-sm hide-sm" href="#/start">
-          My assistants
-        </a>
-      </TopBar>
-      <UnpublishedBanner a={a} />
-      <StorageBanner />
-      <main className="container">
-        {back && (
-          <div style={{ paddingTop: 20 }}>
-            <button className="back-link" onClick={() => navigate(back.to)}>
-              <ChevronLeft size={18} /> {back.label}
-            </button>
-          </div>
-        )}
-        {children}
-      </main>
-      <Toasts />
-    </div>
-  );
-}
-
-function Update({ a, org, section }: { a: Assistant; org: Organisation; section: string }) {
-  const sec = EDIT_SECTIONS.find((s) => s.id === section) ?? EDIT_SECTIONS[0];
-  const home = () => navigate(`/a/${a.id}`);
-  const props: StepProps = { assistant: a, org, mode: 'update', onNext: home, onBack: home };
-  return (
-    <OwnerShell a={a} back={{ label: `${a.draft.name || 'Assistant'} home`, to: `/a/${a.id}` }}>
-      <nav className="subnav" aria-label="Update sections" style={{ marginTop: 12, marginBottom: 0 }}>
-        {EDIT_SECTIONS.map((s) => (
-          <button key={s.id} aria-current={s.id === sec.id ? 'page' : undefined} onClick={() => navigate(`/a/${a.id}/edit/${s.id}`)}>
-            {s.label}
-          </button>
-        ))}
-      </nav>
-      <div key={sec.id}>
-        <StepBody step={sec.step} props={props} />
-      </div>
-    </OwnerShell>
   );
 }
 
@@ -274,8 +341,8 @@ function NotFound({ text = 'This page doesn’t exist.' }: { text?: string }) {
         <h1>Not found</h1>
         <p className="lead">{text}</p>
         <div>
-          <Button variant="primary" onClick={() => navigate('/')}>
-            Go to the start
+          <Button variant="primary" onClick={() => navigate('/projects')}>
+            Go to your projects
           </Button>
         </div>
       </main>
@@ -293,34 +360,44 @@ export function App() {
   if (path === '/' || path === '') return <Landing />;
   if (path === '/signin' || path === '/signup') return <AuthScreen mode={path === '/signin' ? 'signin' : 'signup'} />;
   if (path === '/demo') return <DemoLauncher />;
+  const demoLink = match('/demo/:kind/:section', path) ?? match('/demo/:kind', path);
+  if (demoLink && (demoLink.kind === 'ready' || demoLink.kind === 'published')) return <DemoDeepLink kind={demoLink.kind} section={demoLink.section} />;
 
-  if (!state.session) {
-    // Owner pages need a (demo or local) session; send people to sign in rather than showing a broken page.
-    return <AuthScreen mode="signin" redirectTo={path} />;
+  if (!state.session) return <AuthScreen mode="signin" redirectTo={path} />;
+
+  if (path === '/workspace/new') return <WorkspaceScreen />;
+  if (path.startsWith('/projects')) {
+    if (!state.orgs.length) return <Redirect to="/workspace/new" />;
+    return <ProjectsScreen />;
   }
-  if (path === '/start' || path === '/start/new') return <StartScreen forceNew={path === '/start/new'} />;
+  // Older links from the first prototype.
+  if (path === '/start' || path === '/start/new') return <Redirect to="/projects" />;
 
-  const m =
-    match('/a/:id/setup/:step', path) ??
-    match('/a/:id/edit/:section', path) ??
-    match('/a/:id/conversations', path) ??
-    match('/a/:id/settings', path) ??
-    match('/a/:id', path);
+  const m = match('/p/:id/:section', path) ?? match('/p/:id', path);
   if (m) {
     const a = state.assistants.find((x) => x.id === m.id);
     const org = a && state.orgs.find((o) => o.id === a.orgId);
-    if (!a || !org) return <NotFound text="This assistant could not be found. It may have been reset." />;
-    if (m.step) {
-      const step = (STEPS as readonly string[]).includes(m.step) ? (m.step as StepId) : 'describe';
-      return <Setup a={a} org={org} step={step} />;
-    }
-    if (m.section) return <Update a={a} org={org} section={m.section} />;
-    if (path.endsWith('/conversations')) return <ConversationsScreen a={a} org={org} />;
-    if (path.endsWith('/settings')) return <SettingsScreen a={a} org={org} />;
-    if (!a.setupComplete) return <Redirect to={`/a/${a.id}/setup/${a.currentStep}`} />;
+    if (!a || !org) return <NotFound text="This project could not be found. It may have been reset." />;
+    const section = m.section;
+    if (section && (STEPS as readonly string[]).includes(section)) return <StepPage a={a} org={org} step={section as StepId} />;
+    if (section === 'conversations') return <ConversationsScreen a={a} org={org} />;
+    if (section === 'settings') return <SettingsScreen a={a} org={org} />;
+    if (section) return <NotFound />;
+    if (!a.history.length) return <Redirect to={projectPath(a.id, a.currentStep)} />;
     return <HomeScreen a={a} org={org} />;
   }
   return <NotFound />;
 }
 
-export { DemoStrip, StorageBanner };
+/** Presenter deep links (#/demo/ready, #/demo/published[/step]): seed a fresh sample and open it. */
+function DemoDeepLink({ kind, section }: { kind: 'ready' | 'published'; section?: string }) {
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    done.current = true;
+    const { assistantId } = dispatchWith((s) => op.seedSample(s, kind));
+    const target = section ?? (kind === 'ready' ? 'try' : '');
+    navigate(target ? `/p/${assistantId}/${target}` : `/p/${assistantId}`, { replace: true });
+  }, [kind, section]);
+  return null;
+}

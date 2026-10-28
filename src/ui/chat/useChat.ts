@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AnswerPayload, Assistant, ConversationChannel, Message } from '../../domain/types';
-import { dispatch, dispatchWith, getState, useAppState } from '../../domain/store';
+import { dispatch, dispatchWith, getState, useAppState, isRemoteSession, flushRemote } from '../../domain/store';
+import { api } from '../../lib/api';
 import * as op from '../../domain/operations';
 import { viewFromDraft, viewFromSnapshot, type KnowledgeView } from '../../domain/knowledge';
-import { demoEngine, modelEngine, EngineError } from '../../domain/engine';
+import { demoEngine, modelEngine } from '../../domain/engine';
 import { uid, nowIso } from '../../lib/id';
-import { useModelStatus } from './modelStatus';
+import { refreshModelStatus, useModelStatus } from './modelStatus';
 
 const UNAVAILABLE: AnswerPayload = {
   kind: 'unavailable',
@@ -51,14 +52,20 @@ export function useChat(assistantId: string, channel: ConversationChannel, surfa
   const engine = modelPref === 'model' && modelStatus.modelAvailable ? modelEngine : demoEngine;
 
   const ask = useCallback(
-    async (text: string, convId: string) => {
+    async (text: string, convId: string, messageId: string) => {
       const a = getState().assistants.find((x) => x.id === assistantId);
       if (!a) return;
       const view = knowledgeFor(a, channel);
       setPending(true);
       setLastError(null);
       try {
-        const answer = view ? await engine.answer(view, text) : UNAVAILABLE;
+        let answer: AnswerPayload;
+        if (view && isRemoteSession() && channel === 'test') {
+          await flushRemote();
+          answer = await api<AnswerPayload>(`/api/projects/${assistantId}/answer`, {
+            method: 'POST', body: JSON.stringify({ question: text, engine: modelPref, conversationId: convId, messageId }),
+          });
+        } else answer = view ? await engine.answer(view, text) : UNAVAILABLE;
         const msg: Message = {
           id: uid('m'),
           role: 'assistant',
@@ -69,15 +76,18 @@ export function useChat(assistantId: string, channel: ConversationChannel, surfa
           snapshotVersion: channel !== 'test' ? a.published?.version : undefined,
         };
         dispatch((s) => op.appendMessage(s, convId, msg));
+        // Keep the thinking state until the answer is durable, so an immediate reload cannot lose it.
+        if (isRemoteSession()) await flushRemote();
       } catch (e) {
-        const message = e instanceof EngineError ? e.message : 'Something went wrong while answering.';
+        const message = e instanceof Error ? e.message : 'Something went wrong while answering.';
         setLastError({ text, message });
         throw e;
       } finally {
         setPending(false);
+        if (isRemoteSession()) void refreshModelStatus();
       }
     },
-    [assistantId, channel, engine],
+    [assistantId, channel, engine, modelPref],
   );
 
   const send = useCallback(
@@ -90,7 +100,7 @@ export function useChat(assistantId: string, channel: ConversationChannel, surfa
       const userMsg: Message = { id: uid('m'), role: 'user', text, at: nowIso() };
       dispatch((s) => op.appendMessage(s, convId!, userMsg));
       try {
-        await ask(text, convId);
+        await ask(text, convId, userMsg.id);
         return true;
       } catch {
         // Keep the question visible and remove nothing: mark it as unanswered so it can be retried.
@@ -108,7 +118,7 @@ export function useChat(assistantId: string, channel: ConversationChannel, surfa
       if (!m) return;
       dispatch((s) => op.updateMessage(s, conversationId, messageId, { error: undefined }));
       try {
-        await ask(m.text, conversationId);
+        await ask(m.text, conversationId, m.id);
       } catch {
         dispatch((s) => op.updateMessage(s, conversationId, messageId, { error: 'Not answered' }));
       }
@@ -126,7 +136,11 @@ export function useChat(assistantId: string, channel: ConversationChannel, surfa
   const reset = useCallback(() => setConversationId(null), []);
 
   return useMemo(
-    () => ({ conversation, messages: conversation?.messages ?? [], send, retry, pending, lastError, setFeedback, reset, engineId: engine.id }),
-    [conversation, send, retry, pending, lastError, setFeedback, reset, engine.id],
+    () => {
+      const messages = conversation?.messages ?? [];
+      const visible = isRemoteSession() && pending && messages.at(-1)?.role === 'assistant' ? messages.slice(0, -1) : messages;
+      return { conversation, messages: visible, send, retry, pending, lastError, setFeedback, reset, engineId: isRemoteSession() ? modelPref : engine.id };
+    },
+    [conversation, send, retry, pending, lastError, setFeedback, reset, engine.id, modelPref],
   );
 }

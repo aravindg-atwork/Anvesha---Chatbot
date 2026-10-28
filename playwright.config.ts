@@ -5,6 +5,7 @@ const CI = Boolean(process.env.CI);
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: /local-product/,
   timeout: 90_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
@@ -18,7 +19,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testIgnore: /mobile/ },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testIgnore: [/mobile/, /local-product/] },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile/ },
   ],
   webServer: {

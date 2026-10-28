@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { FileUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Assistant, FaqEntry, Visibility } from '../../../domain/types';
 import { dispatch } from '../../../domain/store';
 import * as op from '../../../domain/operations';
 import { parseFaqCsv, type FaqImportResult } from '../../../domain/ingest/csv';
-import { Button, Confirm, Field, Modal, Notice, toast } from '../../components/ui';
+import { Button, Confirm, Field, FilePicker, Modal, Notice, toast } from '../../components/ui';
 
 export function FaqEditor({
   initial,
@@ -149,7 +149,6 @@ export function useFaqCsvImport(a: Assistant) {
 export function FaqManager({ a }: { a: Assistant }) {
   const [editing, setEditing] = useState<FaqEntry | 'new' | null>(null);
   const [removing, setRemoving] = useState<FaqEntry | null>(null);
-  const csvRef = useRef<HTMLInputElement>(null);
   const csv = useFaqCsvImport(a);
 
   return (
@@ -157,9 +156,9 @@ export function FaqManager({ a }: { a: Assistant }) {
       <div className="spread">
         <h3>Questions and answers</h3>
         <div className="row" style={{ '--gap': '8px' } as React.CSSProperties}>
-          <Button size="sm" icon={<FileUp size={16} />} onClick={() => csvRef.current?.click()}>
+          <FilePicker size="sm" icon={<FileUp size={16} />} accept=".csv,text/csv" onFiles={(f) => csv.start(f[0])}>
             Import CSV
-          </Button>
+          </FilePicker>
           <Button size="sm" variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>
             Add question
           </Button>
@@ -195,17 +194,6 @@ export function FaqManager({ a }: { a: Assistant }) {
           ))}
         </ul>
       )}
-      <input
-        ref={csvRef}
-        type="file"
-        accept=".csv,text/csv"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = '';
-          if (f) csv.start(f);
-        }}
-      />
       {csv.modal}
       {editing && (
         <FaqEditor

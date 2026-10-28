@@ -1,4 +1,4 @@
-import type { AssistantDraft, Starter } from './types';
+import type { AssistantDraft, Starter, Tone } from './types';
 
 /**
  * Transparent templates. No generation service is used: suggestions are built from the
@@ -53,6 +53,12 @@ export function suggestIdentity(description: string, starter: Starter | null, or
   };
 }
 
+export const TONES: { id: Tone; label: string; description: string; instruction: string }[] = [
+  { id: 'friendly', label: 'Friendly', description: 'Warm and reassuring', instruction: 'Use a warm, friendly and reassuring tone.' },
+  { id: 'formal', label: 'Formal', description: 'Polite and professional', instruction: 'Use a polite, formal and professional tone.' },
+  { id: 'concise', label: 'Concise', description: 'Short and to the point', instruction: 'Be brief. Use as few words as possible.' },
+];
+
 /** The full operating instructions, compiled from the plain-language settings. */
 export function generatedInstructions(d: AssistantDraft, orgName: string): string {
   const handover = d.handover.contact.trim()
@@ -64,6 +70,7 @@ export function generatedInstructions(d: AssistantDraft, orgName: string): strin
     `You are ${d.name || 'an assistant'} for ${orgName}.`,
     `Purpose: ${d.purpose}`,
     `Behaviour: ${d.behaviour}`,
+    `Tone: ${TONES.find((t) => t.id === d.tone)?.instruction ?? TONES[0].instruction}`,
     `Reply in ${d.language}.`,
     handover,
     'Use only the information provided by the organisation’s sources. Cite the source for every fact.',

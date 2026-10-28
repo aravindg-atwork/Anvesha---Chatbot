@@ -6,18 +6,7 @@ import * as op from '../../domain/operations';
 import { hasUnpublishedChanges } from '../../domain/publish';
 import { navigate } from '../router';
 import { Button, Confirm, formatDateTime, toast } from '../components/ui';
-import { OwnerShell } from '../App';
-
-export function StatusPill({ a }: { a: Assistant }) {
-  if (a.status === 'live')
-    return (
-      <span className="pill pill-ok">
-        <span className="dot" aria-hidden /> Live · version {a.published?.version}
-      </span>
-    );
-  if (a.status === 'unpublished') return <span className="pill pill-warn">Unpublished</span>;
-  return <span className="pill">Not published</span>;
-}
+import { ProjectShell, projectPath } from '../App';
 
 export function HomeScreen({ a, org }: { a: Assistant; org: Organisation }) {
   const [confirm, setConfirm] = useState(false);
@@ -25,38 +14,44 @@ export function HomeScreen({ a, org }: { a: Assistant; org: Organisation }) {
   const published = conversations.filter((c) => c.assistantId === a.id && c.channel === 'published');
   const unanswered = published.flatMap((c) => c.messages).filter((m) => m.answer && (m.answer.kind === 'no-info')).length;
   const questions = published.reduce((n, c) => n + c.messages.filter((m) => m.role === 'user').length, 0);
+  // The five latest questions people asked the published assistant, newest first.
+  const recent = published
+    .flatMap((c) =>
+      c.messages.flatMap((m, i) =>
+        m.role === 'user' ? [{ id: m.id, at: m.at, question: m.text, answered: c.messages[i + 1]?.answer?.kind === 'answer' }] : [],
+      ),
+    )
+    .sort((x, y) => y.at.localeCompare(x.at))
+    .slice(0, 5);
 
   const actions = [
     {
       icon: <FileText size={22} />,
       t: 'Update information',
       d: `${a.draft.sources.length} sources · ${a.draft.faqs.length} questions and answers`,
-      to: `/a/${a.id}/edit/knowledge`,
+      to: projectPath(a.id, 'upload'),
     },
     {
       icon: <MessagesSquare size={22} />,
       t: 'Review conversations',
       d: questions ? `${questions} question${questions === 1 ? '' : 's'} asked${unanswered ? ` · ${unanswered} unanswered` : ''}` : 'No conversations yet',
-      to: `/a/${a.id}/conversations`,
+      to: projectPath(a.id, 'conversations'),
     },
     {
       icon: <MonitorSmartphone size={22} />,
       t: 'Manage installation',
       d: a.share.channel === 'application' ? 'In your application' : 'On your website',
-      to: `/a/${a.id}/edit/share`,
+      to: projectPath(a.id, 'publish'),
     },
   ];
 
   return (
-    <OwnerShell a={a}>
+    <ProjectShell a={a} org={org} current="overview">
       <section className="home-hero">
         <div className="stack" style={{ '--gap': '12px', maxWidth: 680 } as React.CSSProperties}>
-          <span className="eyebrow">{org.name}</span>
           <div className="row" style={{ '--gap': '14px' } as React.CSSProperties}>
-            <h1>{a.draft.name}</h1>
-            <StatusPill a={a} />
+            <h1>{a.status === 'live' ? `${a.published?.name ?? a.draft.name} is live` : a.status === 'unpublished' ? 'Not answering right now' : 'Not published yet'}</h1>
           </div>
-          <p className="lead">{a.published?.purpose ?? a.draft.purpose}</p>
           {a.published && (
             <p className="faint small">
               Published {formatDateTime(a.published.publishedAt)} · {a.published.audience === 'public' ? 'Anyone' : 'Authorised users (simulated sign-in)'}
@@ -75,7 +70,7 @@ export function HomeScreen({ a, org }: { a: Assistant; org: Organisation }) {
               </Button>
             </>
           ) : (
-            <Button variant="primary" size="lg" onClick={() => navigate(`/a/${a.id}/edit/share`)}>
+            <Button variant="primary" size="lg" onClick={() => navigate(projectPath(a.id, 'publish'))}>
               {a.status === 'unpublished' ? 'Publish again' : 'Publish'}
             </Button>
           )}
@@ -100,17 +95,66 @@ export function HomeScreen({ a, org }: { a: Assistant; org: Organisation }) {
             <CircleAlert size={18} aria-hidden style={{ color: 'var(--warn)' }} />
             {unanswered} question{unanswered === 1 ? ' was' : 's were'} not answered. You can add approved answers for them.
           </span>
-          <Button size="sm" onClick={() => navigate(`/a/${a.id}/conversations`)}>
+          <Button size="sm" onClick={() => navigate(projectPath(a.id, 'conversations'))}>
             Review
           </Button>
         </div>
       )}
 
-      <div className="row" style={{ marginTop: 40, paddingBottom: 60 }}>
-        <Button variant="ghost" icon={<History size={17} />} onClick={() => navigate(`/a/${a.id}/settings`)}>
-          Versions, advanced and settings
+      <div className="split" style={{ marginTop: 28, alignItems: 'start' }}>
+        <section className="card card-pad stack" style={{ '--gap': '12px' } as React.CSSProperties} aria-labelledby="recent-q">
+          <div className="spread">
+            <h2 id="recent-q" style={{ fontSize: '1.1rem' }}>
+              Recent questions
+            </h2>
+            <button className="link-btn small" onClick={() => navigate(projectPath(a.id, 'conversations'))}>
+              View all
+            </button>
+          </div>
+          {recent.length === 0 ? (
+            <p className="muted">Nobody has asked anything yet. Open the assistant and ask the first question.</p>
+          ) : (
+            <ul className="plain-list">
+              {recent.map((r) => (
+                <li key={r.id} className="spread" style={{ flexWrap: 'nowrap' }}>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.question}</span>
+                  <span className={`pill ${r.answered ? 'pill-ok' : 'pill-warn'}`}>{r.answered ? 'Answered' : 'Not answered'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="card card-pad stack" style={{ '--gap': '12px' } as React.CSSProperties} aria-labelledby="live-v">
+          <div className="spread">
+            <h2 id="live-v" style={{ fontSize: '1.1rem' }}>
+              {a.published ? `In version ${a.published.version}` : 'Nothing published yet'}
+            </h2>
+            <button className="link-btn small" onClick={() => navigate(projectPath(a.id, 'settings'))}>
+              All versions
+            </button>
+          </div>
+          {a.published && (
+            <ul className="plain-list">
+              {a.published.sources.map((s) => (
+                <li key={s.id} className="spread" style={{ flexWrap: 'nowrap' }}>
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                  <span className="faint small tabular">{s.chunks.length} passages</span>
+                </li>
+              ))}
+              <li className="spread">
+                <span>Questions and answers</span>
+                <span className="faint small tabular">{a.published.faqs.length}</span>
+              </li>
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <div className="row" style={{ marginTop: 28, paddingBottom: 48 }}>
+        <Button variant="ghost" icon={<History size={17} />} onClick={() => navigate(projectPath(a.id, 'settings'))}>
+          Versions and settings
         </Button>
-        <Button variant="ghost" onClick={() => navigate(`/a/${a.id}/edit/try`)}>
+        <Button variant="ghost" onClick={() => navigate(projectPath(a.id, 'try'))}>
           Try the draft
         </Button>
       </div>
@@ -128,6 +172,6 @@ export function HomeScreen({ a, org }: { a: Assistant; org: Organisation }) {
           onClose={() => setConfirm(false)}
         />
       )}
-    </OwnerShell>
+    </ProjectShell>
   );
 }

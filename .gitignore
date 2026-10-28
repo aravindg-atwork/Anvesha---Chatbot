@@ -1,4 +1,8 @@
 node_modules
+.venv/
+data/
+__pycache__/
+*.pyc
 dist
 .env
 .env.local
@@ -6,4 +10,6 @@ dist
 verification/*.png
 *.tsbuildinfo
 test-results
+test-results-local
 playwright-report
+.taste-skill

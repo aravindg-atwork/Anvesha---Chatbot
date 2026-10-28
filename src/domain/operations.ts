@@ -13,6 +13,7 @@ import type {
   Organisation,
   ShareSettings,
   Source,
+  Starter,
   StepId,
 } from './types';
 import { STEPS } from './types';
@@ -22,7 +23,7 @@ import { effectiveInstructions, suggestIdentity } from './templates';
 import { detectNumberConflicts, pruneConflicts } from './conflicts';
 import { SAMPLE_ORG_NAME, buildSampleSources, sampleConflicts, sampleFaqs } from '../demo/vayutech';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function emptyState(): AppState {
   return { schemaVersion: SCHEMA_VERSION, session: null, orgs: [], assistants: [], conversations: [], modelPreference: 'demo' };
@@ -41,6 +42,9 @@ function emptyDraft(): AssistantDraft {
     behaviour: '',
     handover: { contact: '', process: '' },
     customInstructions: null,
+    tone: 'friendly',
+    avatar: '',
+    starterQuestions: null,
     sources: [],
     faqs: [],
     conflicts: [],
@@ -58,7 +62,8 @@ function newAssistant(orgId: string, isSample: boolean): Assistant {
     publicId: `pub_${uid().slice(0, 10)}`,
     setupComplete: false,
     completedSteps: [],
-    currentStep: 'describe',
+    currentStep: 'upload',
+    trainedSignature: null,
     draft: emptyDraft(),
     draftRevision: 1,
     status: 'draft',
@@ -109,8 +114,81 @@ export function addAssistant(s: AppState, orgId: string): { state: AppState; ass
   return { state: next, assistantId: a.id };
 }
 
+/** A workspace holds an organisation's projects. Creating one does not create a project. */
+export function createWorkspace(s: AppState, name: string): { state: AppState; orgId: string } {
+  const next = clone(s);
+  const org: Organisation = { id: uid('org'), name: name.trim(), createdAt: nowIso(), isSample: false };
+  next.orgs.push(org);
+  return { state: next, orgId: org.id };
+}
+
+/** A project is one assistant. Name and purpose come from the owner's words, editable later. */
+export function createProject(
+  s: AppState,
+  orgId: string,
+  input: { name: string; description: string; starter: Starter | null },
+): { state: AppState; assistantId: string } {
+  const { state, assistantId } = addAssistant(s, orgId);
+  const org = state.orgs.find((o) => o.id === orgId);
+  const sug = suggestIdentity(input.description, input.starter, org?.name ?? 'Your organisation');
+  const name = input.name.trim() || sug.name;
+  return {
+    state: updateDraft(state, assistantId, {
+      ...sug,
+      name,
+      greeting: sug.greeting.replace(sug.name, name),
+      description: input.description.trim(),
+      starter: input.starter,
+      purpose: sug.purpose,
+    }),
+    assistantId,
+  };
+}
+
+/** Identifies the information an assistant answers from; changes when sources or Q&A change. */
+export function knowledgeSignature(d: AssistantDraft): string {
+  const src = d.sources.map((x) => `${x.id}:${x.status}:${x.chunks.length}:${x.supersedes ?? ''}`).join('|');
+  const faq = d.faqs.filter((f) => f.approved).map((f) => `${f.id}:${f.answer.length}`).join('|');
+  return `${src}#${faq}`;
+}
+
+export function needsTraining(a: Assistant): boolean {
+  return a.trainedSignature !== knowledgeSignature(a.draft);
+}
+
+/** Records that the current information has been prepared ("trained") for answering. */
+export function markTrained(s: AppState, id: string): AppState {
+  return withAssistant(s, id, (a) => {
+    a.trainedSignature = knowledgeSignature(a.draft);
+  });
+}
+
+/**
+ * Demo helper: loads the fictional VayuTech documents into any project, so a presenter can
+ * create a project from scratch and continue with the scripted sample story.
+ */
+export function addSampleDocuments(s: AppState, id: string): AppState {
+  return withAssistant(
+    s,
+    id,
+    (a) => {
+      const existing = new Set(a.draft.sources.map((x) => x.sampleKey).filter(Boolean));
+      const sources = buildSampleSources(`${a.id}-${uid().slice(0, 4)}`, nowIso()).filter((x) => !existing.has(x.sampleKey));
+      a.draft.sources.push(...sources);
+      const known = new Set(a.draft.faqs.map((f) => f.question.toLowerCase()));
+      for (const f of sampleFaqs(`${a.id}-${uid().slice(0, 4)}`)) {
+        if (!known.has(f.question.toLowerCase())) a.draft.faqs.push({ ...f, code: nextFaqCode(a.draft.faqs) });
+      }
+      const conflictIds = new Set(a.draft.conflicts.map((c) => c.id));
+      a.draft.conflicts.push(...sampleConflicts(a.draft.sources).filter((c) => !conflictIds.has(c.id)));
+      a.isSample = true;
+    },
+    true,
+  );
+}
+
 /** Fields that change how the assistant answers. Editing them creates a new draft revision. */
-const ANSWER_FIELDS: (keyof AssistantDraft)[] = ['name', 'purpose', 'behaviour', 'language', 'handover', 'customInstructions', 'sources', 'faqs', 'conflicts'];
+const ANSWER_FIELDS: (keyof AssistantDraft)[] = ['name', 'purpose', 'behaviour', 'tone', 'language', 'handover', 'customInstructions', 'sources', 'faqs', 'conflicts'];
 
 export function updateDraft(s: AppState, id: string, patch: Partial<AssistantDraft>): AppState {
   const bump = Object.keys(patch).some((k) => ANSWER_FIELDS.includes(k as keyof AssistantDraft));
@@ -238,7 +316,7 @@ export function publish(s: AppState, id: string): AppState {
     x.history.push(snap);
     x.status = 'live';
     x.setupComplete = true;
-    if (!x.completedSteps.includes('share')) x.completedSteps.push('share');
+    if (!x.completedSteps.includes('publish')) x.completedSteps.push('publish');
   });
 }
 
@@ -305,15 +383,16 @@ export function seedSample(s: AppState, kind: 'ready' | 'published'): { state: A
     faqs: sampleFaqs(a.id),
     conflicts: sampleConflicts(sources),
   };
-  a.completedSteps = ['describe', 'knowledge', 'review'];
+  a.completedSteps = ['upload', 'training'];
   a.currentStep = 'try';
+  a.trainedSignature = knowledgeSignature(a.draft);
   next.orgs.push(org);
   next.assistants.push(a);
   if (!next.session) next.session = { kind: 'demo' };
   if (kind === 'published') {
     a.share.audience = 'authorised';
     a.share.channel = 'website';
-    a.completedSteps = ['describe', 'knowledge', 'review', 'try'];
+    a.completedSteps = ['upload', 'training', 'try', 'review', 'make'];
     a.draft.handover = { contact: 'the HR Care desk at hrcare@vayutech.example or extension 2040', process: '' };
     // Resolve the version conflict in favour of the 2025 edition before publishing.
     a.draft.conflicts.forEach((c) => (c.resolution = { kind: 'prefer', sourceId: c.a.sourceId }));
@@ -321,6 +400,7 @@ export function seedSample(s: AppState, kind: 'ready' | 'published'): { state: A
     const s2025 = a.draft.sources.find((x) => x.sampleKey === 'leave-2025');
     if (s2023 && s2025) s2025.supersedes = s2023.id;
     a.draftRevision += 1;
+    a.trainedSignature = knowledgeSignature(a.draft);
     next = publish(next, a.id);
   }
   return { state: next, assistantId: a.id };

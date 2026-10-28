@@ -1,19 +1,17 @@
-import { useRef, useState } from 'react';
-import { ArrowRight, ChevronLeft, FilePlus2, MessagesSquare, PenLine, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, ChevronLeft, FileUp, MessagesSquare, PenLine, Sparkles } from 'lucide-react';
 import type { Source, Visibility } from '../../domain/types';
-import { dispatch } from '../../domain/store';
+import { dispatch, useAppState, isRemoteSession } from '../../domain/store';
 import * as op from '../../domain/operations';
 import { chunkPlainText } from '../../domain/ingest/txt';
 import { ACCEPTED, fileTypeOf } from '../../domain/ingest';
 import { uid, nowIso } from '../../lib/id';
-import { Button, Field, Modal, Notice, toast } from '../components/ui';
-import type { StepProps } from '../App';
+import { Button, Field, FilePicker, Modal, Notice, toast } from '../components/ui';
+import { StepHeading, type StepProps } from '../App';
 import { SourceList } from './knowledge/SourceList';
 import { FaqManager, useFaqCsvImport } from './knowledge/FaqManager';
-import { ConflictList } from './knowledge/Conflicts';
 import { addFile } from './knowledge/processing';
-
-type Panel = 'upload' | 'faq' | null;
+import { useProcessing } from './knowledge/useProcessing';
 
 function WriteModal({ onSave, onClose }: { onSave: (title: string, text: string, vis: Visibility) => void; onClose: () => void }) {
   const [title, setTitle] = useState('');
@@ -38,7 +36,7 @@ function WriteModal({ onSave, onClose }: { onSave: (title: string, text: string,
               onClose();
             }}
           >
-            Add to knowledge
+            Add to project
           </Button>
         </>
       }
@@ -62,68 +60,38 @@ function WriteModal({ onSave, onClose }: { onSave: (title: string, text: string,
   );
 }
 
-export function KnowledgeStep({ assistant: a, mode, onNext, onBack }: StepProps) {
+export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onBack }: StepProps) {
+  const processing = useProcessing(a.id);
   const d = a.draft;
-  const [panel, setPanel] = useState<Panel>(d.sources.length || d.faqs.length ? null : 'upload');
+  const isDemo = useAppState((s) => s.session?.kind === 'demo');
   const [writing, setWriting] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
   const [over, setOver] = useState(false);
   const [blocked, setBlocked] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const csv = useFaqCsvImport(a);
 
   const handleFiles = (list: FileList | File[]) => {
     setBlocked(null);
     for (const f of Array.from(list)) {
       // CSVs are question-and-answer imports, with their own preview.
-      if (fileTypeOf(f.name) === 'CSV') {
-        csv.start(f);
-        setPanel('faq');
-      } else addFile(a.id, f);
+      if (fileTypeOf(f.name) === 'CSV') csv.start(f);
+      else addFile(a.id, f);
     }
   };
 
   const ready = d.sources.filter((s) => s.status === 'ready').length + d.faqs.filter((f) => f.approved).length;
   const reading = d.sources.some((s) => s.status === 'reading');
-
-  const options = [
-    { id: 'upload' as const, icon: <Upload size={22} />, t: 'Upload files', desc: 'PDF, Word or text files' },
-    { id: 'faq' as const, icon: <MessagesSquare size={22} />, t: 'Add questions and answers', desc: 'Type them, or import a CSV' },
-    { id: 'write' as const, icon: <PenLine size={22} />, t: 'Write information', desc: 'Paste or type it in' },
-  ];
+  const hasSample = d.sources.some((s) => s.sampleKey);
 
   return (
     <div className="screen">
-      <div className="screen-head">
-        {mode === 'setup' && <span className="eyebrow">Step 2 of 5</span>}
-        <h1>Give your assistant the information it needs.</h1>
-      </div>
+      <StepHeading step="upload" n={stepNumber} title="Give your assistant the information it needs." intro="Upload documents, add questions and answers, or write it in your own words." />
 
       <div className="stack" style={{ '--gap': '28px' } as React.CSSProperties}>
-        <div className="add-options">
-          {options.map((o) => (
-            <button
-              key={o.id}
-              className="choice"
-              aria-pressed={panel === o.id}
-              onClick={() => {
-                if (o.id === 'write') setWriting(true);
-                else setPanel(panel === o.id ? null : o.id);
-              }}
-            >
-              <span className="choice-icon">{o.icon}</span>
-              <span>
-                <span className="choice-title">{o.t}</span>
-                <span className="choice-desc" style={{ display: 'block' }}>
-                  {o.desc}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {panel === 'upload' && (
+        <div className="upload-grid">
+          {/* The whole card is the drop target and the button always opens the file picker. */}
           <div
-            className={`dropzone ${over ? 'over' : ''}`}
+            className={`dropzone upload-main ${over ? 'over' : ''}`}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(true);
@@ -135,77 +103,110 @@ export function KnowledgeStep({ assistant: a, mode, onNext, onBack }: StepProps)
               handleFiles(e.dataTransfer.files);
             }}
           >
-            <div className="stack" style={{ alignItems: 'center', '--gap': '12px' } as React.CSSProperties}>
-              <FilePlus2 size={30} aria-hidden style={{ color: 'var(--accent)' }} />
-              <p style={{ fontSize: '1.1rem' }}>Drag files here, or</p>
-              <Button variant="primary" onClick={() => fileRef.current?.click()}>
-                Choose files
-              </Button>
-              <p className="faint small">PDF, Word (.docx), text (.txt) and question-and-answer CSV · up to 15 MB each. Scanned pages can’t be read yet.</p>
+            <span className="choice-icon" style={{ width: 52, height: 52 }}>
+              <FileUp size={26} />
+            </span>
+            <div className="stack" style={{ '--gap': '4px', alignItems: 'center' } as React.CSSProperties}>
+              <strong style={{ fontSize: '1.15rem' }}>Upload files</strong>
+              <span className="muted small">Drag files here, or choose them from your computer</span>
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept={ACCEPTED}
-              hidden
-              onChange={(e) => {
-                if (e.target.files) handleFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
+            <FilePicker variant="primary" accept={ACCEPTED} multiple onFiles={handleFiles} testId="file-input">
+              Choose files
+            </FilePicker>
+            <span className="faint small">PDF, Word, text, CSV, PNG, JPG, WEBP or TIFF · up to 15 MB. Images and scans use OCR.</span>
           </div>
-        )}
+          <div className="upload-side">
+            <button className="choice" aria-expanded={faqOpen} onClick={() => setFaqOpen(!faqOpen)}>
+              <span className="choice-icon">
+                <MessagesSquare size={22} />
+              </span>
+              <span>
+                <span className="choice-title">Add questions and answers</span>
+                <span className="choice-desc" style={{ display: 'block' }}>
+                  {d.faqs.length ? `${d.faqs.length} so far · type them or import a CSV` : 'Type them, or import a CSV'}
+                </span>
+              </span>
+            </button>
+            <button className="choice" onClick={() => setWriting(true)}>
+              <span className="choice-icon">
+                <PenLine size={22} />
+              </span>
+              <span>
+                <span className="choice-title">Write information</span>
+                <span className="choice-desc" style={{ display: 'block' }}>
+                  Paste or type it in
+                </span>
+              </span>
+            </button>
+            {isDemo && !hasSample && (
+              <button
+                className="choice choice-demo"
+                onClick={() => {
+                  dispatch((s) => op.addSampleDocuments(s, a.id));
+                  toast('VayuTech sample documents added.');
+                }}
+              >
+                <span className="choice-icon">
+                  <Sparkles size={22} />
+                </span>
+                <span>
+                  <span className="choice-title">Use VayuTech sample documents</span>
+                  <span className="choice-desc" style={{ display: 'block' }}>
+                    Demo only · fictional leave policy, benefits and FAQs
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
 
-        {panel === 'faq' && (
+        {faqOpen && (
           <div className="card card-pad">
             <FaqManager a={a} />
           </div>
         )}
 
-        {d.sources.length > 0 && (
+        {d.sources.length > 0 ? (
           <section className="stack" aria-label="Your information">
-            <h3>Your information</h3>
+            <h2 style={{ fontSize: '1.35rem' }}>Your information</h2>
             <SourceList a={a} />
           </section>
+        ) : (
+          <div className="panel muted center-text">Nothing added yet. Your files will appear here with their status.</div>
         )}
 
-        {panel !== 'faq' && d.faqs.length > 0 && (
+        {!faqOpen && d.faqs.length > 0 && (
           <div className="panel spread">
             <span>
               <strong>Questions and answers</strong> · {d.faqs.length} entr{d.faqs.length === 1 ? 'y' : 'ies'}
             </span>
-            <Button size="sm" onClick={() => setPanel('faq')}>
+            <Button size="sm" onClick={() => setFaqOpen(true)}>
               Manage
             </Button>
           </div>
         )}
 
-        <ConflictList a={a} />
-
+        {processing.error && <Notice tone="danger">{processing.error}</Notice>}
         {blocked && <Notice tone="warn">{blocked}</Notice>}
       </div>
 
       <div className="action-bar">
         <button className="back-link" onClick={onBack}>
-          <ChevronLeft size={18} /> {mode === 'setup' ? 'Back' : 'Done'}
+          <ChevronLeft size={18} /> Projects
         </button>
-        {mode === 'setup' ? (
-          <Button
-            variant="primary"
-            size="lg"
-            iconEnd={<ArrowRight size={20} />}
-            onClick={() => {
-              if (reading) return setBlocked('Please wait until all files have been read.');
-              if (!ready) return setBlocked('Add at least one source that is ready, or a question and answer, to continue.');
-              onNext();
-            }}
-          >
-            Continue
-          </Button>
-        ) : (
-          <span className="faint small">Changes are saved to your draft. Publish to make them live.</span>
-        )}
+        <Button
+          variant="primary"
+          size="lg"
+          iconEnd={<ArrowRight size={20} />}
+          onClick={() => {
+            if (isRemoteSession() && d.sources.length) { onNext(); return; }
+            if (reading) return setBlocked('Please wait until all files have been read.');
+            if (!ready) return setBlocked('Add at least one file that is ready, or a question and answer, to continue.');
+            onNext();
+          }}
+        >
+          {nextLabel}
+        </Button>
       </div>
 
       {writing && (
@@ -227,7 +228,7 @@ export function KnowledgeStep({ assistant: a, mode, onNext, onBack }: StepProps)
               addedAt: nowIso(),
             };
             dispatch((st) => op.addSource(st, a.id, s));
-            toast('Information added to the draft.');
+            toast('Information added.');
           }}
         />
       )}

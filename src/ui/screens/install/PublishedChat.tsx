@@ -3,7 +3,7 @@ import type { Assistant } from '../../../domain/types';
 import { ChatPanel } from '../../chat/ChatPanel';
 import { SourceInspector } from '../../chat/SourceInspector';
 import { useChat } from '../../chat/useChat';
-import { suggestedQuestions } from '../../chat/suggestions';
+import { starterQuestionsFor } from '../../chat/suggestions';
 
 /**
  * End-user conversation. Always answers from the published snapshot, never the draft,
@@ -26,7 +26,7 @@ export function PublishedChat({ a, orgName, surface, compact, showInspector = tr
       handover={snap?.handover ?? { contact: '', process: '' }}
       orgName={orgName}
       greeting={live ? a.share.widget.greeting || snap.greeting : undefined}
-      suggestions={live ? suggestedQuestions(snap.sources, snap.faqs, a.isSample, compact ? 2 : 3) : []}
+      suggestions={live ? starterQuestionsFor(snap.starterQuestions, snap.sources, snap.faqs, a.isSample, compact ? 2 : 3) : []}
       onViewSources={showInspector ? (m, n) => setInspect({ messageId: m.id, n: n ?? 1 }) : undefined}
       activeMessageId={inspect?.messageId}
       activeCitation={inspect?.n}

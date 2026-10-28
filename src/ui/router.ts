@@ -19,6 +19,9 @@ export function usePath(): string {
     const on = () => setPath(currentPath());
     window.addEventListener('hashchange', on);
     window.addEventListener('popstate', on);
+    // Catch any navigation that happened between the first render and this effect
+    // (child effects, such as a redirect, run before this listener is attached).
+    on();
     return () => {
       window.removeEventListener('hashchange', on);
       window.removeEventListener('popstate', on);

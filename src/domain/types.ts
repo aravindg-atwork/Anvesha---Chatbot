@@ -2,7 +2,7 @@
 
 export type Visibility = 'internal' | 'public';
 export type SourceStatus = 'reading' | 'ready' | 'attention';
-export type FileType = 'PDF' | 'DOCX' | 'TXT' | 'CSV' | 'Written' | 'Other';
+export type FileType = 'PDF' | 'DOCX' | 'TXT' | 'CSV' | 'Image' | 'Written' | 'Other';
 
 /** Where a passage came from, using only references that extraction actually produced. */
 export type Locator =
@@ -19,6 +19,7 @@ export interface Chunk {
 }
 
 export interface Source {
+  serverManaged?: boolean;
   id: string;
   title: string;
   fileName?: string;
@@ -79,12 +80,18 @@ export interface AssistantDraft {
   handover: Handover;
   /** null means "use the generated instructions". */
   customInstructions: string | null;
+  tone: Tone;
+  /** One or two characters (letter or emoji) shown as the assistant's avatar. */
+  avatar: string;
+  /** Owner-chosen starter questions; null means "suggest from the sources". */
+  starterQuestions: string[] | null;
   sources: Source[];
   faqs: FaqEntry[];
   conflicts: Conflict[];
 }
 
 export type Starter = 'employee' | 'admissions' | 'customer' | 'other';
+export type Tone = 'friendly' | 'formal' | 'concise';
 
 export type Audience = 'public' | 'authorised';
 export type Channel = 'website' | 'application';
@@ -115,6 +122,8 @@ export interface Snapshot {
   language: string;
   instructions: string;
   handover: Handover;
+  tone: Tone;
+  starterQuestions: string[] | null;
   sources: Source[];
   faqs: FaqEntry[];
   conflicts: Conflict[];
@@ -123,7 +132,7 @@ export interface Snapshot {
 
 export type PublishStatus = 'draft' | 'live' | 'unpublished';
 
-export const STEPS = ['describe', 'knowledge', 'review', 'try', 'share'] as const;
+export const STEPS = ['upload', 'training', 'try', 'review', 'make', 'publish'] as const;
 export type StepId = (typeof STEPS)[number];
 
 export interface Assistant {
@@ -136,6 +145,8 @@ export interface Assistant {
   setupComplete: boolean;
   completedSteps: StepId[];
   currentStep: StepId;
+  /** Signature of the information when the training step last prepared it. */
+  trainedSignature: string | null;
   draft: AssistantDraft;
   draftRevision: number;
   status: PublishStatus;
@@ -175,6 +186,11 @@ export interface AnswerPayload {
   method: AnswerMethod;
   showHandover: boolean;
   suggestions?: string[];
+  model?: string | null;
+  framework?: string;
+  grounding?: 'reviewed' | 'rejected';
+  warnings?: string[];
+  sourceRevision?: string;
 }
 
 export interface Message {

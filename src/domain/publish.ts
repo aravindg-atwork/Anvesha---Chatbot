@@ -63,6 +63,8 @@ export function createSnapshot(a: Assistant, audience: Audience, instructions: s
     language: a.draft.language,
     instructions,
     handover: a.draft.handover,
+    tone: a.draft.tone,
+    starterQuestions: a.draft.starterQuestions,
     sources: plan.included,
     faqs: plan.faqsIncluded,
     conflicts: a.draft.conflicts.filter((c) => ids.has(c.a.sourceId) && ids.has(c.b.sourceId)),

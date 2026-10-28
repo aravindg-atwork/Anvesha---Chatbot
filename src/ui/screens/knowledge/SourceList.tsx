@@ -1,12 +1,12 @@
-import { useRef, useState } from 'react';
-import { AlertCircle, CalendarClock, CheckCircle2, Eye, Loader2, MoreHorizontal, RefreshCw, Replace, Settings2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, CalendarClock, FileText, FileWarning, PenLine, CheckCircle2, Eye, Loader2, MoreHorizontal, RefreshCw, Replace, Settings2, Trash2 } from 'lucide-react';
 import type { Assistant, Source } from '../../../domain/types';
 import { dispatch } from '../../../domain/store';
 import * as op from '../../../domain/operations';
 import { formatLocator, isOutdated, supersededIds } from '../../../domain/knowledge';
 import { ACCEPTED } from '../../../domain/ingest';
-import { Button, Confirm, Field, Modal, formatDate, toast } from '../../components/ui';
-import { canRetry, forget, replace, retry } from './processing';
+import { Button, Confirm, Field, FilePicker, Modal, formatDate, toast } from '../../components/ui';
+import { canRetry, removeFile, replace, retry } from './processing';
 
 export function StatusPill({ s }: { s: Source }) {
   if (s.status === 'reading')
@@ -147,14 +147,13 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
   const [preview, setPreview] = useState(false);
   const [details, setDetails] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const outdated = isOutdated(s.reviewBy);
   const isFile = s.origin !== 'written';
 
   return (
     <li className="source-row">
       <span className="file-badge" aria-hidden>
-        {s.fileType === 'Written' ? 'TEXT' : s.fileType === 'Other' ? 'FILE' : s.fileType}
+        {s.fileType === 'Written' ? <PenLine size={20} /> : s.fileType === 'Other' ? <FileWarning size={20} /> : <FileText size={20} />}
       </span>
       <div style={{ minWidth: 0 }}>
         <div className="source-title">{s.title}</div>
@@ -189,9 +188,9 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
               Try again
             </Button>
           ) : (
-            <Button size="sm" icon={<Replace size={15} />} onClick={() => fileRef.current?.click()}>
+            <FilePicker size="sm" icon={<Replace size={15} />} accept={ACCEPTED} onFiles={(f) => replace(a.id, s.id, f[0])}>
               Replace file
-            </Button>
+            </FilePicker>
           )
         )}
         {s.status === 'attention' && (
@@ -224,9 +223,19 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
                 <Settings2 size={16} /> Details and version
               </button>
               {isFile && (
-                <button role="menuitem" className="btn btn-ghost btn-sm" style={{ justifyContent: 'flex-start' }} onClick={() => (setMenu(false), fileRef.current?.click())}>
-                  <Replace size={16} /> Replace file
-                </button>
+                <FilePicker
+                  variant="ghost"
+                  size="sm"
+                  style={{ justifyContent: 'flex-start' }}
+                  icon={<Replace size={16} />}
+                  accept={ACCEPTED}
+                  onFiles={(f) => {
+                    setMenu(false);
+                    replace(a.id, s.id, f[0]);
+                  }}
+                >
+                  Replace file
+                </FilePicker>
               )}
               <button role="menuitem" className="btn btn-ghost btn-sm" style={{ justifyContent: 'flex-start', color: 'var(--danger)' }} onClick={() => (setMenu(false), setConfirmRemove(true))}>
                 <Trash2 size={16} /> Remove
@@ -234,17 +243,6 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
             </div>
           )}
         </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept={ACCEPTED}
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = '';
-            if (f) replace(a.id, s.id, f);
-          }}
-        />
       </div>
       {preview && <PreviewModal s={s} onClose={() => setPreview(false)} />}
       {details && <DetailsModal a={a} s={s} onClose={() => setDetails(false)} />}
@@ -258,10 +256,9 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
           }
           confirmLabel="Remove"
           danger
-          onConfirm={() => {
-            forget(s.id);
-            dispatch((st) => op.removeSource(st, a.id, s.id));
-            toast('Source removed from the draft.');
+          onConfirm={async () => {
+            try { await removeFile(a.id, s.id); toast('Source removed from the draft.'); }
+            catch (e) { toast(e instanceof Error ? e.message : 'Removal failed.'); }
           }}
           onClose={() => setConfirmRemove(false)}
         />

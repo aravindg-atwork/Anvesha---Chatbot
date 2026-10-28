@@ -6,7 +6,7 @@ import * as op from '../../domain/operations';
 import { EVIDENCE_TEXT } from '../../domain/engine/common';
 import { Button, formatDateTime, toast } from '../components/ui';
 import { AnswerText } from '../chat/ChatPanel';
-import { OwnerShell } from '../App';
+import { ProjectShell } from '../App';
 import { FaqEditor } from './knowledge/FaqManager';
 
 const KIND_LABEL = { answer: 'Answered', clarify: 'Asked to clarify', conflict: 'Conflicting sources', 'no-info': 'Not answered', unavailable: 'Unavailable' } as const;
@@ -23,7 +23,7 @@ function metrics(convs: Conversation[]) {
   ];
 }
 
-export function ConversationsScreen({ a }: { a: Assistant; org: Organisation }) {
+export function ConversationsScreen({ a, org }: { a: Assistant; org: Organisation }) {
   const [tab, setTab] = useState<ConversationChannel>('published');
   const [openId, setOpenId] = useState<string | null>(null);
   const [faqFor, setFaqFor] = useState<string | null>(null);
@@ -39,8 +39,8 @@ export function ConversationsScreen({ a }: { a: Assistant; org: Organisation }) 
   const existing = new Set(a.draft.faqs.map((f) => f.question.trim().toLowerCase()));
 
   return (
-    <OwnerShell a={a} back={{ label: `${a.draft.name} home`, to: `/a/${a.id}` }}>
-      <div className="screen" style={{ paddingTop: 16 }}>
+    <ProjectShell a={a} org={org} current="conversations">
+      <div className="screen">
         <div className="screen-head">
           <h1>Conversations</h1>
           <p className="lead">See what people ask and where the assistant needs better information.</p>
@@ -164,6 +164,6 @@ export function ConversationsScreen({ a }: { a: Assistant; org: Organisation }) 
           }}
         />
       )}
-    </OwnerShell>
+    </ProjectShell>
   );
 }

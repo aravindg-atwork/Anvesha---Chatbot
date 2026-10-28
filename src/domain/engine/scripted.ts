@@ -31,8 +31,13 @@ function emergency(view: KnowledgeView, index: IndexedChunk[], question: string)
   const q = question.toLowerCase();
   const who = RELATIVES.find((r) => q.includes(r));
   const citations = [makeCitation(1, casual, REQUIRED_PASSAGE)];
+  const empathy = {
+    friendly: `I’m sorry to hear ${who ? `your ${who} is in hospital` : 'about your family emergency'}. That must be a worrying time.`,
+    formal: `I understand that ${who ? `your ${who} is in hospital` : 'you are dealing with a family emergency'}, and I am sorry for the difficult circumstances.`,
+    concise: '',
+  }[view.tone ?? 'friendly'];
   const paragraphs = [
-    `I’m sorry to hear ${who ? `your ${who} is in hospital` : 'about your family emergency'}. That must be a worrying time.`,
+    empathy,
     'Because you’re on probation, casual leave isn’t available to you. [1]',
     'Family emergencies are handled differently: you can submit a request to HR, who will review your situation individually. Submitting a request doesn’t guarantee approval. [1]',
     handoverLine(view, 'To start, contact your HR team and explain your situation and the days you need.'),
@@ -43,10 +48,14 @@ function emergency(view: KnowledgeView, index: IndexedChunk[], question: string)
     citations.push(makeCitation(2, faq.chunk, faq.chunk.text.split('\n\n').slice(1).join('\n\n')));
     paragraphs.push(`${faq.chunk.text.split('\n\n').slice(1).join(' ')} [2]`);
   }
-  paragraphs.push('I can explain the policy, but I can’t approve or reject leave. That decision is made by HR.');
+  paragraphs.push(
+    view.tone === 'concise'
+      ? 'Only HR can approve or reject leave.'
+      : 'I can explain the policy, but I can’t approve or reject leave. That decision is made by HR.',
+  );
   return {
     kind: 'answer',
-    text: paragraphs.join('\n\n'),
+    text: paragraphs.filter(Boolean).join('\n\n'),
     citations,
     evidence: 'strong',
     evidenceReason: 'Every statement in this answer is taken from the highlighted policy passage.',
