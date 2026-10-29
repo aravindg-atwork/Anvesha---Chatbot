@@ -7,5 +7,7 @@ data
 test-results
 test-results-local
 playwright-report
+.shots
+.jury
 *.log
 __pycache__

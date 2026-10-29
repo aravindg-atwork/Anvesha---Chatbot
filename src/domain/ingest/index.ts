@@ -2,7 +2,7 @@ import type { Chunk, FileType, Source } from '../types';
 import { sha256 } from '../../lib/hash';
 import { chunkPlainText } from './txt';
 
-export const ACCEPTED = '.pdf,.docx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp';
+export const ACCEPTED = '.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.webm,.mov';
 export const MAX_BYTES = 15 * 1024 * 1024;
 
 export function fileTypeOf(name: string): FileType | null {
@@ -11,6 +11,10 @@ export function fileTypeOf(name: string): FileType | null {
   if (ext === 'docx') return 'DOCX';
   if (ext === 'txt' || ext === 'md') return 'TXT';
   if (ext === 'csv') return 'CSV';
+  if (ext === 'xlsx') return 'XLSX';
+  if (ext === 'pptx') return 'PPTX';
+  if (ext && ['mp3', 'wav', 'm4a', 'ogg', 'flac'].includes(ext)) return 'Audio';
+  if (ext && ['mp4', 'webm', 'mov'].includes(ext)) return 'Video';
   if (ext && ['png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'bmp'].includes(ext)) return 'Image';
   return null;
 }
@@ -53,6 +57,7 @@ export interface Extraction {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export async function extractFile(type: FileType, data: ArrayBuffer, sourceId: string): Promise<Extraction> {
+  if (['XLSX', 'PPTX', 'Audio', 'Video'].includes(type)) return { chunks: [], note: '', attention: 'Sign in to process spreadsheets, presentations and media with the Python backend. Audio/video require cloud transcription consent and a Gemini API key.' };
   if (type === 'Image') return { chunks: [], note: '', attention: 'Image OCR requires a signed-in account and the local Python backend. Sign in to process this image.' };
   if (type === 'TXT') {
     const text = new TextDecoder('utf-8').decode(data);

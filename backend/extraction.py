@@ -12,6 +12,9 @@ from PIL import Image, ImageOps, ImageSequence
 
 Image.MAX_IMAGE_PIXELS = 40_000_000
 EXTENSIONS = {'.pdf': 'PDF', '.docx': 'DOCX', '.txt': 'TXT', '.md': 'TXT', '.csv': 'CSV',
+              '.xlsx': 'XLSX', '.pptx': 'PPTX',
+              '.mp3': 'Audio', '.wav': 'Audio', '.m4a': 'Audio', '.ogg': 'Audio', '.flac': 'Audio',
+              '.mp4': 'Video', '.webm': 'Video', '.mov': 'Video',
               '.png': 'Image', '.jpg': 'Image', '.jpeg': 'Image', '.webp': 'Image', '.tif': 'Image', '.tiff': 'Image', '.bmp': 'Image'}
 
 
@@ -81,6 +84,15 @@ def extract(path: Path, file_type: str, report):
                     text = ocr(image)
                 pages.append((text, {'kind': 'section', 'heading': 'Embedded image (OCR)', 'ordinal': len(pages)+1}))
                 ocr_count += 1
+    elif file_type == 'XLSX':
+        from backend.office import spreadsheet
+        pages = spreadsheet(path, report)
+    elif file_type == 'PPTX':
+        from backend.office import presentation
+        pages, ocr_count = presentation(path, report, ocr)
+    elif file_type in ('Audio', 'Video'):
+        from backend.media import transcribe
+        pages = transcribe(path, report)
     elif file_type == 'CSV':
         text = path.read_text(encoding='utf-8-sig')
         for i, row in enumerate(csv.reader(io.StringIO(text))):
@@ -93,6 +105,10 @@ def extract(path: Path, file_type: str, report):
     note = f'Read {len(pages)} page(s)/section(s) locally; OCR used on {ocr_count} image(s)/page(s).'
     if ocr_count:
         note += ' OCR may contain errors; review the extracted passages before relying on answers.'
+    if file_type == 'XLSX':
+        note += ' References preserve sheet names and cell ranges. Only cached formula results are read; formulas are not recalculated.'
+    if file_type in ('Audio', 'Video'):
+        note = 'Speech transcribed by Gemini with approximate timestamps. Media was sent to Google with your consent. Review transcription accuracy; video visuals are not indexed.'
     return pages, note
 
 

@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.auth import current_user
@@ -23,18 +23,39 @@ router = APIRouter(prefix='/api/projects')
 MAX_UPLOAD = 15 * 1024 * 1024
 
 
+def folder_path(value: str):
+    value = value.strip()
+    if not value:
+        return ''
+    parts = value.split('/')
+    if len(value) > 240 or len(parts) > 10 or any(
+        not re.fullmatch(r'[\w .()-]{1,60}', p) or p in ('.', '..') or p != p.strip() or p.endswith('.')
+        for p in parts
+    ):
+        raise HTTPException(400, 'Use up to 10 folder levels, with letters, numbers, spaces, dots, hyphens or parentheses. Maximum path length is 240 characters.')
+    return '/'.join(parts)
+
+
 @router.post('/{project_id}/sources')
-async def upload(project_id: str, file: UploadFile = File(...), user=Depends(current_user)):
+async def upload(project_id: str, file: UploadFile = File(...), folder: str = Form(''), mediaConsent: bool = Form(False), user=Depends(current_user)):
     from pathlib import Path
+    folder = folder_path(folder)
     name = Path((file.filename or 'upload').replace('\\', '/')).name
     extension = Path(name).suffix.lower()
     if extension not in EXTENSIONS:
-        raise HTTPException(400, 'Use PDF, DOCX, text, CSV, PNG, JPG, WEBP, TIFF or BMP files.')
+        raise HTTPException(400, 'Use PDF, DOCX, XLSX, PPTX, text, CSV, images, MP3/WAV/M4A/OGG/FLAC or MP4/WEBM/MOV.')
+    if EXTENSIONS[extension] in ('Audio', 'Video'):
+        if not mediaConsent:
+            raise HTTPException(400, 'Allow cloud transcription before uploading audio or video. Media is sent to Google Gemini.')
+        if not os.getenv('GOOGLE_API_KEY'):
+            raise HTTPException(503, 'Configure GOOGLE_API_KEY on the server to transcribe audio/video.')
     content = await file.read(MAX_UPLOAD + 1)
     if not content:
         raise HTTPException(400, 'This file is empty.')
     if len(content) > MAX_UPLOAD:
         raise HTTPException(413, 'Files must be 15 MB or smaller.')
+    if EXTENSIONS[extension] in ('Audio', 'Video') and len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, 'Audio/video clips must be 10 MB or smaller.')
     digest = hashlib.sha256(content).hexdigest()
     with connect() as db:
         owned_project(db, project_id, user['id'])
@@ -43,17 +64,50 @@ async def upload(project_id: str, file: UploadFile = File(...), user=Depends(cur
             if source.get('hash') == digest:
                 raise HTTPException(409, f"This file already exists as {source['title']}.")
         source_id = uuid4().hex
-        directory = data_dir() / 'uploads' / user['id'] / project_id
+        directory = data_dir() / 'uploads' / user['id'] / project_id / folder
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / (source_id + extension)
         path.write_bytes(content)
         source = {'id': source_id, 'title': Path(name).stem.replace('_', ' ').replace('-', ' '), 'fileName': name,
                   'fileType': EXTENSIONS[extension], 'size': len(content), 'hash': digest, 'status': 'reading',
                   'chunks': [], 'visibility': 'internal', 'origin': 'upload', 'addedAt': datetime.now(timezone.utc).isoformat(),
-                  'serverManaged': True}
+                  'serverManaged': True, 'folderPath': folder, 'transcriptionConsent': mediaConsent}
         db.execute('INSERT INTO sources(id,project_id,path,data) VALUES (?,?,?,?)', (source_id, project_id, str(path), json.dumps(source)))
         job_id = enqueue(db, project_id, 'ingest', source_id)
     return {'source': source, 'jobId': job_id}
+
+
+class SourceFolder(BaseModel):
+    folder: str = Field(max_length=240)
+
+
+@router.patch('/{project_id}/sources/{source_id}/folder')
+def move_source(project_id: str, source_id: str, body: SourceFolder, user=Depends(current_user)):
+    from pathlib import Path
+    folder = folder_path(body.folder)
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        owned_project(db, project_id, user['id'])
+        row = db.execute('SELECT * FROM sources WHERE id=? AND project_id=? AND deleted=0', (source_id, project_id)).fetchone()
+        if not row:
+            raise HTTPException(404, 'Source not found.')
+        if db.execute("SELECT id FROM jobs WHERE source_id=? AND status='running'", (source_id,)).fetchone():
+            raise HTTPException(409, 'Wait until this file finishes processing before moving it.')
+        old = Path(row['path'])
+        root = (data_dir() / 'uploads' / user['id'] / project_id).resolve()
+        target = (root / folder / old.name).resolve()
+        if not target.is_relative_to(root):
+            raise HTTPException(400, 'Invalid folder path.')
+        if old.resolve() != target:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            old.rename(target)
+            parsed = Path(str(old) + '.parsed.json')
+            if parsed.exists():
+                parsed.rename(Path(str(target) + '.parsed.json'))
+        source = json.loads(row['data'])
+        source['folderPath'] = folder
+        db.execute('UPDATE sources SET path=?,data=? WHERE id=?', (str(target), json.dumps(source), source_id))
+    return {'source': source}
 
 
 @router.get('/{project_id}/processing')
@@ -74,7 +128,16 @@ def processing(project_id: str, user=Depends(current_user)):
 def delete_source(project_id: str, source_id: str, user=Depends(current_user)):
     with connect() as db:
         owned_project(db, project_id, user['id'])
+        record = db.execute('SELECT data FROM sources WHERE id=? AND project_id=?', (source_id, project_id)).fetchone()
+        file_id = json.loads(record['data']).get('driveFileId') if record else None
+        link = db.execute('SELECT config FROM drive_links WHERE project_id=?', (project_id,)).fetchone()
+        if file_id and link:
+            config = json.loads(link['config'])
+            config['excludedIds'] = list(set(config.get('excludedIds', []) + [file_id]))
+            db.execute('UPDATE drive_links SET config=? WHERE project_id=?', (json.dumps(config), project_id))
         db.execute('UPDATE sources SET deleted=1 WHERE id=? AND project_id=?', (source_id, project_id))
+        from backend.worker import enqueue_index_when_settled
+        enqueue_index_when_settled(db, project_id)
         db.execute("UPDATE jobs SET status='cancelled',stage='Source removed' WHERE source_id=? AND project_id=? AND status='queued'", (source_id, project_id))
     return {'ok': True}
 
@@ -144,6 +207,8 @@ async def answer_project(project_id: str, body: Question, request: Request, user
     passages = merge_passages(pinned, retrieved)
     if not passages:
         return limitation('I couldn’t find enough supporting information in your current sources to answer that. Try naming the topic or document.')
+    from backend.drive import validate_passage_access
+    await asyncio.to_thread(validate_passage_access, project, user['id'], passages)
     draft = project['draft']
     org = ''
     with connect() as db:
@@ -156,6 +221,8 @@ async def answer_project(project_id: str, body: Question, request: Request, user
         f"For help contact: {draft.get('handover', {}).get('contact', '')}. {draft.get('handover', {}).get('process', '')}"])
     warnings = []
     used_sources = {p['sourceId'] for p in passages}
+    if any(s['id'] in used_sources and s.get('fileType') in ('Audio', 'Video') for s in draft.get('sources', [])):
+        warnings.append('This answer uses an AI speech transcript. Timestamps and transcription may be inaccurate; check the original recording.')
     if any(s['id'] in used_sources and (s.get('fileType') == 'Image' or re.search(r'OCR used on [1-9]', s.get('extractionNote', '')))
            for s in draft.get('sources', [])):
         warnings.append('This answer uses OCR text. Check the original image if any word looks wrong or changes the meaning.')

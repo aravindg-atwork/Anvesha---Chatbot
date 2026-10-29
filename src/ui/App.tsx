@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   BarChart3,
   Check,
@@ -17,20 +17,21 @@ import { Redirect, match, navigate, usePath } from './router';
 import { BrandMark, Button, Notice, Toasts } from './components/ui';
 import { Avatar } from './components/avatar';
 export { Avatar, AvatarGlyph, AVATAR_KEYS } from './components/avatar';
-import { Landing } from './screens/Landing';
-import { AuthScreen } from './screens/Auth';
-import { WorkspaceScreen, ProjectsScreen } from './screens/Projects';
-import { DemoLauncher } from './screens/DemoLauncher';
-import { KnowledgeStep } from './screens/Knowledge';
-import { TrainingStep } from './screens/Training';
-import { TryStep } from './screens/Try';
-import { ReviewStep } from './screens/Review';
-import { MakeStep } from './screens/Make';
-import { ShareStep } from './screens/Share';
-import { HomeScreen } from './screens/Home';
-import { ConversationsScreen } from './screens/Conversations';
-import { SettingsScreen } from './screens/Settings';
-import { PublicChat } from './screens/PublicChat';
+const Landing = lazy(() => import('./screens/Landing').then(module => ({ default: module.Landing })));
+const AuthScreen = lazy(() => import('./screens/Auth').then(module => ({ default: module.AuthScreen })));
+const WorkspaceScreen = lazy(() => import('./screens/Projects').then(module => ({ default: module.WorkspaceScreen })));
+const ProjectsScreen = lazy(() => import('./screens/Projects').then(module => ({ default: module.ProjectsScreen })));
+const DemoLauncher = lazy(() => import('./screens/DemoLauncher').then(module => ({ default: module.DemoLauncher })));
+const KnowledgeStep = lazy(() => import('./screens/Knowledge').then(module => ({ default: module.KnowledgeStep })));
+const TrainingStep = lazy(() => import('./screens/Training').then(module => ({ default: module.TrainingStep })));
+const TryStep = lazy(() => import('./screens/Try').then(module => ({ default: module.TryStep })));
+const ReviewStep = lazy(() => import('./screens/Review').then(module => ({ default: module.ReviewStep })));
+const MakeStep = lazy(() => import('./screens/Make').then(module => ({ default: module.MakeStep })));
+const ShareStep = lazy(() => import('./screens/Share').then(module => ({ default: module.ShareStep })));
+const HomeScreen = lazy(() => import('./screens/Home').then(module => ({ default: module.HomeScreen })));
+const ConversationsScreen = lazy(() => import('./screens/Conversations').then(module => ({ default: module.ConversationsScreen })));
+const SettingsScreen = lazy(() => import('./screens/Settings').then(module => ({ default: module.SettingsScreen })));
+const PublicChat = lazy(() => import('./screens/PublicChat').then(module => ({ default: module.PublicChat })));
 
 export const STEP_LABEL: Record<StepId, string> = {
   upload: 'Upload',
@@ -351,6 +352,10 @@ function NotFound({ text = 'This page doesn’t exist.' }: { text?: string }) {
 }
 
 export function App() {
+  return <Suspense fallback={<div className="app-opening" role="status"><Brand /><span>Opening your workspace…</span></div>}><AppRoutes /></Suspense>;
+}
+
+function AppRoutes() {
   const path = usePath();
   const state = useAppState((s) => s);
 

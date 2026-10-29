@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Copy, Loader2, X, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { FrostCloud } from '@/components/ui/frost-cloud';
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-solid';
 
@@ -32,10 +33,8 @@ export function Button({
 
 export function BrandMark({ size = 30 }: { size?: number }) {
   return (
-    <span className="brand-mark" style={{ width: size, height: size }} aria-hidden>
-      <svg width={size * 0.62} height={size * 0.62} viewBox="0 0 32 32">
-        <path d="M7 25 16 6l9 19M10.4 18.5h11.2" fill="none" stroke="#f8f4ec" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+    <span className="brand-mark cloud-brand-mark" style={{ width: size + 6, height: size + 6 }} aria-hidden>
+      <FrostCloud background={false} color="brand" interactive={false} compact followPointer={false} />
     </span>
   );
 }

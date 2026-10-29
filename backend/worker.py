@@ -40,6 +40,8 @@ def ingest_stage(job_id, step):
     source_data = json.loads(source['data'])
     report_fn = lambda stage, pct, message: report(job_id, stage, pct, message)
     if step == 'parse':
+        if source_data['fileType'] in ('Audio', 'Video') and not source_data.get('transcriptionConsent'):
+            raise ValueError('Cloud transcription consent is required before processing media.')
         pages, note = extract(Path(source['path']), source_data['fileType'], report_fn)
         # A durable intermediate file makes extraction inspectable without exposing server paths to clients.
         Path(source['path'] + '.parsed.json').write_text(json.dumps({'pages': pages, 'note': note}), encoding='utf-8')
@@ -50,9 +52,14 @@ def ingest_stage(job_id, step):
         if not chunks:
             raise ValueError('No readable text was found, including after OCR. Try a clearer image or another document.')
         source_data.update(status='ready', chunks=chunks, extractionNote=parsed['note'])
+        from backend.catalog import describe_source
+        report(job_id, 'Catalogue tool', 80, 'Assigning suggested labels, tags and questions from the extracted content.')
+        source_data.update(describe_source(source_data))
         source_data.pop('attention', None)
         with connect() as db:
             db.execute('UPDATE sources SET data=? WHERE id=? AND deleted=0', (json.dumps(source_data), source['id']))
+            # Coalesce indexing after the final file in a batch, without making the owner click Train.
+            enqueue_index_when_settled(db, job['project_id'])
         report(job_id, 'Passage curator', 100, f'Prepared {len(chunks)} cited passages. Ready for indexing.')
 
 
@@ -87,6 +94,10 @@ class PipelineStage(BaseAgent):
 
 
 async def run_job(job):
+    if job['kind'] == 'drive_sync':
+        from backend.drive import run_sync
+        await asyncio.to_thread(run_sync, job)
+        return
     agents = ([PipelineStage(name='document_reader_and_ocr', operation='parse'),
                PipelineStage(name='passage_curator', operation='chunk')] if job['kind'] == 'ingest' else
               [PipelineStage(name='search_indexer', operation='index')])
@@ -111,7 +122,24 @@ class Worker:
         self.thread.start()
 
     def loop(self):
+        last_schedule = 0
+        last_scan = 0
         while not self.stop.is_set():
+            import time
+            if time.monotonic() - last_schedule > 60:
+                from backend.drive import schedule_syncs
+                try:
+                    schedule_syncs()
+                except Exception:
+                    log.exception('Drive sync scheduling failed')
+                last_schedule = time.monotonic()
+            if time.monotonic() - last_scan > 15:
+                from backend.source_watch import scan_sources
+                try:
+                    scan_sources()
+                except Exception:
+                    log.exception('Registered source scan failed')
+                last_scan = time.monotonic()
             with connect() as db:
                 db.execute('BEGIN IMMEDIATE')
                 row = db.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created_at,rowid LIMIT 1").fetchone()
@@ -138,6 +166,7 @@ class Worker:
                             data = json.loads(source['data'])
                             data.update(status='attention', attention=error, chunks=[])
                             db.execute('UPDATE sources SET data=? WHERE id=?', (json.dumps(data), job['source_id']))
+                        enqueue_index_when_settled(db, job['project_id'])
 
     def close(self):
         self.stop.set()
@@ -149,3 +178,19 @@ def enqueue(db, project_id, kind, source_id=None):
     job_id = uuid4().hex
     db.execute('INSERT INTO jobs(id,project_id,source_id,kind) VALUES (?,?,?,?)', (job_id, project_id, source_id, kind))
     return job_id
+
+
+def enqueue_index_when_settled(db, project_id):
+    records = db.execute('SELECT data FROM sources WHERE project_id=? AND deleted=0', (project_id,)).fetchall()
+    if any(json.loads(row['data']).get('status') == 'reading' for row in records):
+        return
+    row = db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone()
+    if not row:
+        return
+    from backend.vectors import eligible
+    project = project_data(db, row)
+    if not eligible(project) or row['index_revision'] == signature(project):
+        return
+    if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND kind='index' AND status IN ('queued','running')", (project_id,)).fetchone():
+        return
+    enqueue(db, project_id, 'index')

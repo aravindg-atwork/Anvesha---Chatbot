@@ -18,7 +18,8 @@ export function planPublication(a: Assistant, audience: Audience): PublicationPl
   const included: Source[] = [];
   const excluded: PublicationPlan['excluded'] = [];
   for (const s of d.sources) {
-    if (s.status !== 'ready') excluded.push({ source: s, reason: s.status === 'reading' ? 'Still being read' : 'Needs attention' });
+    if (s.driveFileId) excluded.push({ source: s, reason: 'Connected Drive sources are private to the signed-in owner' });
+    else if (s.status !== 'ready') excluded.push({ source: s, reason: s.status === 'reading' ? 'Still being read' : 'Needs attention' });
     else if (audience === 'public' && s.visibility !== 'public') excluded.push({ source: s, reason: 'Internal only' });
     else if (superseded.has(s.id)) excluded.push({ source: s, reason: 'Replaced by a newer version' });
     else included.push(s);

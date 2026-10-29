@@ -6,7 +6,7 @@ import type { Source } from '../../../domain/types';
 export interface ProcessingJob {
   id: string;
   source_id: string | null;
-  kind: 'ingest' | 'index';
+  kind: 'ingest' | 'index' | 'drive_sync';
   status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
   stage: string;
   progress: number;

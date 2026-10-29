@@ -27,6 +27,7 @@ from backend.worker import Worker
 from backend.auth import router as auth_router, current_user
 from backend.state import router as state_router
 from backend.projects import router as projects_router
+from backend.drive import router as drive_router, configured as drive_configured
 from backend.answers import CONNECTION, invoke_structured, provider_error
 
 
@@ -44,7 +45,22 @@ app = FastAPI(title='Anvesha API', version='0.3.0', lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(state_router)
 app.include_router(projects_router)
+app.include_router(drive_router)
 log = logging.getLogger(__name__)
+
+
+class OAuthAccessFilter(logging.Filter):
+    def filter(self, record):
+        # Uvicorn's access args contain the full request URL; OAuth codes must not be logged.
+        if isinstance(record.args, tuple) and len(record.args) >= 3:
+            args = list(record.args)
+            if isinstance(args[2], str) and args[2].startswith('/api/drive/callback'):
+                args[2] = '/api/drive/callback'
+                record.args = tuple(args)
+        return True
+
+
+logging.getLogger('uvicorn.access').addFilter(OAuthAccessFilter())
 hits: dict[str, deque] = defaultdict(deque)
 
 RULES = """Answer only from the reference passages supplied in the user message.
@@ -102,6 +118,7 @@ async def http_error(request, exc):
 async def status():
     configured = bool(os.getenv('GOOGLE_API_KEY'))
     return {'modelAvailable': configured, 'model': MODEL if configured else None, 'provider': 'google-gemini',
+            'mediaAvailable': configured, 'driveConfigured': drive_configured(),
             'framework': 'langchain', 'backend': True, 'connectionState': CONNECTION['state'] if configured else 'unconfigured',
             'modelError': CONNECTION['error'] if configured else None}
 

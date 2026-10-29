@@ -83,10 +83,11 @@ export interface ChatPanelProps {
   disabledReason?: string;
   placeholder?: string;
   errorText?: string | null;
+  initialQuestion?: string;
 }
 
 export function ChatPanel(p: ChatPanelProps) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(p.initialQuestion ?? '');
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const empty = p.messages.length === 0;

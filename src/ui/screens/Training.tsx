@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, CalendarClock, CheckCircle2, ChevronLeft, Info, RefreshCw } from 'lucide-react';
 import { dispatch, isRemoteSession } from '../../domain/store';
+import { PreparationCanvas, PreparationStages, PreparedQuestions, SourcePreparationList, useStudioEntrance } from './knowledge/KnowledgeCanvas';
+import './knowledge/studio.css';
 import { ServerTraining } from './ServerTraining';
 import * as op from '../../domain/operations';
 import { isOutdated, supersededIds } from '../../domain/knowledge';
@@ -23,6 +25,7 @@ export function TrainingStep(props: StepProps) {
 
 function DemoTrainingStep({ assistant: a, stepNumber, nextLabel, onNext, onBack }: StepProps) {
   const d = a.draft;
+  const studioRef = useStudioEntrance();
   const stale = op.needsTraining(a);
   const ready = d.sources.filter((s) => s.status === 'ready');
   const total = ready.length * 3;
@@ -61,13 +64,14 @@ function DemoTrainingStep({ assistant: a, stepNumber, nextLabel, onNext, onBack 
   const canAnswer = suggestedQuestions(d.sources, d.faqs, a.isSample, 4);
 
   return (
-    <div className="screen">
-      <StepHeading
+    <div className="screen training-studio demo-training-studio" ref={studioRef}>
+      <header className="knowledge-studio-hero" data-studio-enter><div><span className="studio-section-kicker"><span>02</span> The preparation room</span><StepHeading
         step="training"
         n={stepNumber}
         title={running ? 'Preparing your information…' : 'Your assistant is ready to answer.'}
         intro={running ? 'Anvesha is reading each source and organising it so answers can point to the right passage.' : undefined}
-      />
+      /></div><span className="preparation-state-badge">Browser demo</span></header>
+      <div className="preparation-overview" data-studio-enter><PreparationCanvas running={running} ready={!running} sources={d.sources.length} passages={passages} demo task={running ? 'Demo: preparing example sources' : undefined} /><PreparationStages ready={!running} running={running} activeStep={Math.min(4, Math.floor(tick / Math.max(1, total) * 5))} /></div>
 
       {running ? (
         <div className="card card-pad stack" style={{ '--gap': '18px' } as React.CSSProperties} role="status" aria-live="polite">
@@ -91,19 +95,8 @@ function DemoTrainingStep({ assistant: a, stepNumber, nextLabel, onNext, onBack 
         </div>
       ) : (
         <div className="stack" style={{ '--gap': '28px' } as React.CSSProperties}>
-          <div className="metrics">
-            {[
-              ['Sources ready', ready.length - superseded.size],
-              ['Passages indexed', passages],
-              ['Questions & answers', d.faqs.filter((f) => f.approved).length],
-              ['Topics found', topics.length],
-            ].map(([label, value]) => (
-              <div key={label} className="panel metric">
-                <span className="metric-value">{value}</span>
-                <span className="muted small">{label}</span>
-              </div>
-            ))}
-          </div>
+          <PreparedQuestions a={a} />
+          <SourcePreparationList a={a} />
 
           {topics.length > 0 && (
             <section className="stack" style={{ '--gap': '12px' } as React.CSSProperties}>
@@ -171,7 +164,7 @@ function DemoTrainingStep({ assistant: a, stepNumber, nextLabel, onNext, onBack 
         </div>
       )}
 
-      <div className="action-bar">
+      <div className="action-bar knowledge-studio-footer">
         <button className="back-link" onClick={onBack}>
           <ChevronLeft size={18} /> Back
         </button>

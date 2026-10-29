@@ -1,0 +1,19 @@
+.drive-heading { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.drive-heading > div { flex:1; min-width:180px; }
+.drive-heading h2 { font-size:1.2rem; margin-bottom:6px; }
+.drive-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.drive-actions > span { margin-right:auto; overflow-wrap:anywhere; }
+.drive-picker { border-top:1px solid #3a0f3418; padding-top:20px; }
+.drive-breadcrumbs { display:flex; gap:8px; flex-wrap:wrap; }
+.drive-breadcrumbs button { display:flex; gap:6px; align-items:center; border:0; padding:8px; border-radius:8px; background:#ffffffb3; color:var(--brand-ink); cursor:pointer; }
+.drive-folder-list, .drive-preview-list { max-height:320px; overflow:auto; border:1px solid #3a0f341a; border-radius:12px; padding:8px; background:#ffffff8f; }
+.drive-folder-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 10px; border-bottom:1px solid #3a0f340c; }
+.drive-folder-row label { min-height:40px; flex:1; min-width:0; overflow-wrap:anywhere; }
+.drive-selected { display:flex; flex-wrap:wrap; gap:8px; }
+.drive-preview-item { display:flex; gap:12px; padding:12px 8px; border-bottom:1px solid #3a0f340d; cursor:pointer; }
+.drive-preview-item input { flex:none; width:18px; height:18px; margin-top:3px; accent-color:var(--brand-ink); }
+.drive-preview-item span { min-width:0; overflow-wrap:anywhere; }
+.drive-preview-item strong { display:block; font-size:14px; }
+.drive-preview-item small { display:block; color:var(--text-muted); margin-top:3px; }
+.drive-summary { display:flex; gap:12px 20px; flex-wrap:wrap; padding-top:12px; border-top:1px solid #3a0f3412; color:var(--text-muted); }
+.drive-summary p, .drive-summary details, .drive-summary .notice { flex-basis:100%; }

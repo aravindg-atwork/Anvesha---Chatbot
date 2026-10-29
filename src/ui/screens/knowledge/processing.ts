@@ -46,12 +46,14 @@ async function processInto(assistantId: string, sourceId: string, file: File) {
 }
 
 /** Adds a document and reads it. CSV files are handled separately as question-and-answer imports. */
-export async function addFile(assistantId: string, file: File) {
+export async function addFile(assistantId: string, file: File, folderPath = '', mediaConsent = false) {
   if (isRemoteSession()) {
     try {
       await flushRemote();
       const form = new FormData();
       form.append('file', file);
+      form.append('folder', folderPath);
+      form.append('mediaConsent', String(mediaConsent));
       const result = await api<{ source: Source }>(`/api/projects/${assistantId}/sources`, { method: 'POST', body: form });
       dispatch((s) => op.addSource(s, assistantId, result.source));
     } catch (e) { toast(e instanceof Error ? e.message : 'Upload failed. Please retry.'); }
@@ -62,6 +64,7 @@ export async function addFile(assistantId: string, file: File) {
   files.set(id, file);
   const source: Source = {
     id,
+    folderPath,
     title: titleFromFileName(file.name),
     fileName: file.name,
     fileType: type ?? 'Other',
@@ -98,6 +101,8 @@ export async function replace(assistantId: string, sourceId: string, file: File)
     try {
       const form = new FormData();
       form.append('file', file);
+      form.append('folder', assistantSources(assistantId).find(s => s.id === sourceId)?.folderPath ?? '');
+      form.append('mediaConsent', String(assistantSources(assistantId).find(s => s.id === sourceId)?.transcriptionConsent ?? false));
       const result = await api<{ source: Source }>(`/api/projects/${assistantId}/sources`, { method: 'POST', body: form });
       await removeFile(assistantId, sourceId);
       dispatch((s) => op.addSource(s, assistantId, result.source));

@@ -173,7 +173,12 @@ export function applyServerSources(assistantId: string, sources: Source[]) {
       const fresh = incoming.get(s.id);
       if (!fresh) return s;
       incoming.delete(s.id);
-      return { ...s, status: fresh.status, attention: fresh.attention, chunks: fresh.chunks, extractionNote: fresh.extractionNote };
+      return { ...s, status: fresh.status, attention: fresh.attention, chunks: fresh.chunks, extractionNote: fresh.extractionNote,
+        fileType: fresh.fileType, fileName: fresh.fileName, size: fresh.size, hash: fresh.hash,
+        driveFileId: fresh.driveFileId, driveRevision: fresh.driveRevision, sourceUrl: fresh.sourceUrl,
+        documentLabel: fresh.documentLabel, autoTags: fresh.autoTags, suggestedQuestions: fresh.suggestedQuestions, catalogMethod: fresh.catalogMethod, cataloguedAt: fresh.cataloguedAt,
+        transcriptionConsent: fresh.transcriptionConsent, folderPath: fresh.driveFileId ? fresh.folderPath : s.folderPath,
+      };
     });
     return { ...a, draft: { ...a.draft, sources: [...merged, ...incoming.values()] } };
   }) };

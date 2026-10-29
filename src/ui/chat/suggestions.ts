@@ -9,8 +9,16 @@ export function suggestedQuestions(sources: Source[], faqs: FaqEntry[], isSample
   const out: string[] = [];
   const topics = new Set<string>();
   for (const f of faqs) if (f.approved && out.length < 2) out.push(f.question);
+  const superseded = new Set(sources.map(source => source.supersedes).filter(Boolean));
+  for (const source of sources) {
+    if (source.status !== 'ready' || superseded.has(source.id)) continue;
+    for (const question of source.suggestedQuestions ?? []) {
+      if (out.length >= max) break;
+      if (!out.includes(question)) out.push(question);
+    }
+  }
   for (const s of sources) {
-    if (s.status !== 'ready') continue;
+    if (s.status !== 'ready' || superseded.has(s.id)) continue;
     for (const c of s.chunks) {
       if (out.length >= max) break;
       const generic = /^(image\s*\d+.*|page\s*\d+.*|document|paragraph\s*\d+|table\s*\d+|embedded image.*)$/i;

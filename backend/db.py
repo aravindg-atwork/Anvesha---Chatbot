@@ -60,6 +60,20 @@ def init_db():
           project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, data TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS jobs_project ON jobs(project_id, created_at);
         CREATE INDEX IF NOT EXISTS sources_project ON sources(project_id);
+        CREATE TABLE IF NOT EXISTS drive_connections (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          credentials TEXT NOT NULL, email TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1);
+        CREATE TABLE IF NOT EXISTS drive_oauth_states (
+          state TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          session_hash TEXT NOT NULL, project_id TEXT NOT NULL, verifier TEXT NOT NULL, expires INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS drive_links (
+          project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          config TEXT NOT NULL, last_sync INTEGER NOT NULL DEFAULT 0, error TEXT, summary TEXT NOT NULL DEFAULT '{}');
+        CREATE TABLE IF NOT EXISTS drive_items (
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, file_id TEXT NOT NULL,
+          source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE, fingerprint TEXT NOT NULL,
+          PRIMARY KEY(project_id,file_id));
         ''')
 
 
@@ -72,9 +86,11 @@ def source_list(db, project):
         if source['id'] in uploaded:
             authoritative = uploaded.pop(source['id'])
             # Owner metadata is editable; extracted text and job status are server-owned.
-            for key in ('title', 'visibility', 'version', 'effectiveDate', 'reviewBy', 'supersedes'):
+            for key in ('title', 'visibility', 'version', 'effectiveDate', 'reviewBy', 'supersedes', 'tags'):
                 if key in source:
                     authoritative[key] = source[key]
+            if authoritative.get('driveFileId'):
+                authoritative['visibility'] = 'internal'
             result.append(authoritative)
         elif source.get('origin') != 'upload':
             result.append(source)

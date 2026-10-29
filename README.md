@@ -4,6 +4,8 @@
 
 UI setup and supplied component integration: see [docs/ui-setup.md](docs/ui-setup.md) for Tailwind, shadcn paths, ThinkingTool, the mesh shader and glass theme.
 
+Google Drive folder import, Google Docs/Sheets/Slides, Excel/PowerPoint and opt-in media transcription: see [docs/google-drive-setup.md](docs/google-drive-setup.md) for activation, supported formats, sync behavior and limits.
+
 Anvesha is a local knowledge-assistant product built with React, a Python API, Google ADK, SQLite and Qdrant. Create an account, create workspaces and named projects, upload documents and images, watch real processing jobs, then test cited answers against your sources. External widget/API publishing remains a preview.
 
 ## Run the local product with Docker (recommended)
@@ -210,3 +212,9 @@ Everything lives in this browser's `localStorage`:
 - conversations (question, answer, sources and rating; no personal details).
 
 *Versions and settings → Your data* explains this and has confirmed delete and reset actions.
+
+## Knowledge folders
+
+On Upload, create a path such as `HR/Policies`, choose the upload destination, and browse sources with the expandable folder tree. Counts include nested sources; selecting a folder lists its direct sources. Move a source through **More actions > Details and version > Folder**. Folder choices persist with the project. Signed-in uploads are stored in matching directories under `/data/uploads/<user>/<project>/`; originals keep unique IDs to avoid filename collisions. Empty folders exist in project metadata until a file is uploaded. Moves wait for active processing to finish. CSV imports remain in Questions and answers.
+
+Folders support 10 levels, 60 characters per segment and 240 characters per path. There is no configured total file or folder count limit; practical capacity depends on disk, memory and processing time and has not been load-tested. The existing 15 MB per-file upload limit still applies.

@@ -70,6 +70,8 @@ def save_state(body: StateWrite, user=Depends(current_user)):
                     db.execute('INSERT INTO projects(id,user_id,workspace_id,data) VALUES (?,?,?,?) '
                                'ON CONFLICT(id) DO UPDATE SET workspace_id=excluded.workspace_id,data=excluded.data',
                                (item['id'], user['id'], item['orgId'], json.dumps(item)))
+                    from backend.worker import enqueue_index_when_settled
+                    enqueue_index_when_settled(db, item['id'])
                 else:
                     if item.get('assistantId') not in project_ids:
                         raise HTTPException(400, 'Conversation project not found.')

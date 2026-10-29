@@ -2,13 +2,16 @@
 
 export type Visibility = 'internal' | 'public';
 export type SourceStatus = 'reading' | 'ready' | 'attention';
-export type FileType = 'PDF' | 'DOCX' | 'TXT' | 'CSV' | 'Image' | 'Written' | 'Other';
+export type FileType = 'PDF' | 'DOCX' | 'TXT' | 'CSV' | 'XLSX' | 'PPTX' | 'Audio' | 'Video' | 'Image' | 'Written' | 'Other';
 
 /** Where a passage came from, using only references that extraction actually produced. */
 export type Locator =
   | { kind: 'pdf'; pageIndex: number; pageLabel?: string } // pageIndex is 1-based physical page
   | { kind: 'section'; heading: string; ordinal: number }
   | { kind: 'paragraph'; ordinal: number }
+  | { kind: 'sheet'; sheet: string; range: string }
+  | { kind: 'slide'; slide: number }
+  | { kind: 'media'; startSeconds: number; endSeconds: number }
   | { kind: 'faq'; entryId: string; code: string; question: string };
 
 export interface Chunk {
@@ -19,6 +22,17 @@ export interface Chunk {
 }
 
 export interface Source {
+  documentLabel?: string;
+  autoTags?: string[];
+  tags?: string[];
+  suggestedQuestions?: string[];
+  catalogMethod?: string;
+  cataloguedAt?: string;
+  driveFileId?: string;
+  driveRevision?: string;
+  sourceUrl?: string;
+  transcriptionConsent?: boolean;
+  folderPath?: string;
   serverManaged?: boolean;
   id: string;
   title: string;
@@ -70,6 +84,7 @@ export interface Handover {
 }
 
 export interface AssistantDraft {
+  folders?: string[];
   description: string;
   starter: Starter | null;
   name: string;

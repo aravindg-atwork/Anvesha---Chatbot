@@ -1,29 +1,29 @@
-/* Anvesha — warm ivory canvas, deep editorial blue shell, one amber evidence highlight. */
+/* Anvesha — Ice Silver canvas, Deep Aubergine shell, Marigold evidence highlights. */
 :root {
-  --bg: #f7f5ef;
-  --bg-deep: #efebe1;
+  --bg: #dde3e8;
+  --bg-deep: #cbd3db;
   --surface: #ffffff;
-  --surface-muted: #fbfaf6;
-  --text: #161a22;
-  --text-muted: #555b67;
-  --text-faint: #6b7180;
-  --border: #e6e1d6;
-  --border-strong: #d2cbbd;
+  --surface-muted: #f4f6f8;
+  --text: #3a0f34;
+  --text-muted: #665161;
+  --text-faint: #665161;
+  --border: #cbd3db;
+  --border-strong: #a5a2ac;
 
-  --accent: #1c3d73;
-  --accent-hover: #142e59;
+  --accent: #3a0f34;
+  --accent-hover: #4e1946;
   --accent-ink: #ffffff;
-  --accent-soft: #e9eef7;
-  --accent-line: #bccbe3;
+  --accent-soft: #eee6ed;
+  --accent-line: #cbb4c7;
 
-  --shell: #132a4f;
-  --shell-raised: #1b365f;
+  --shell: #3a0f34;
+  --shell-raised: #4e1946;
   --shell-line: rgba(255, 255, 255, 0.1);
-  --shell-text: #eef1f7;
-  --shell-muted: #a9b6cc;
+  --shell-text: #dde3e8;
+  --shell-muted: #cbbdca;
 
-  --mark: #fbe5a3; /* evidence highlight: the one signature colour */
-  --mark-ink: #3d2c05;
+  --mark: #eaaa00; /* evidence highlight: the one signature colour */
+  --mark-ink: #3a0f34;
   --ok: #24704b;
   --ok-soft: #e4f2ea;
   --warn: #8a5a0c;
@@ -41,7 +41,7 @@
   --shadow-sm: 0 1px 2px rgba(22, 32, 54, 0.05);
   --shadow: 0 1px 2px rgba(22, 32, 54, 0.04), 0 10px 28px -16px rgba(22, 32, 54, 0.18);
   --shadow-lg: 0 30px 70px -30px rgba(19, 42, 79, 0.35);
-  --focus: 0 0 0 2px var(--bg), 0 0 0 4px #3a6bc4;
+  --focus: 0 0 0 2px var(--bg), 0 0 0 4px #eaaa00;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: light;
 }

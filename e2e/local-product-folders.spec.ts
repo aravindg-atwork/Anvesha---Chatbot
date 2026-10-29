@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+
+test('nested upload folders and source moves persist after reload', async ({ page }) => {
+  await page.goto('/#/signup');
+  await page.getByRole('textbox', { name: 'Your name' }).fill('Folder Tester');
+  await page.getByRole('textbox', { name: 'Email' }).fill(`folders-${Date.now()}@example.com`);
+  await page.getByLabel('Password', { exact: true }).fill('folder-test-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('textbox', { name: 'Workspace name' }).fill('Folder verification');
+  await page.getByRole('button', { name: 'Create workspace' }).click();
+  const project = page.getByRole('dialog', { name: 'New project' });
+  await project.getByRole('textbox', { name: 'What should it help with?' }).fill('Organize policy files');
+  await project.getByRole('textbox', { name: 'Assistant name' }).fill('Folder assistant');
+  await project.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('textbox', { name: 'New folder path' }).fill('HR/Policies');
+  await page.getByRole('button', { name: 'Create folder', exact: true }).click();
+  await expect(page.getByLabel('Upload destination')).toHaveValue('HR/Policies');
+  await page.getByTestId('file-input').setInputFiles({ name: 'folder-policy.txt', mimeType: 'text/plain', buffer: Buffer.from('Employees receive eighteen days of annual leave each year.') });
+  await expect(page.locator('.source-row')).toContainText('HR/Policies');
+  await expect(page.locator('.source-row')).toContainText('Ready', { timeout: 60_000 });
+  const nav = page.getByRole('navigation', { name: 'Knowledge folders' });
+  await expect(nav.getByRole('button', { name: 'HR (1)', exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Collapse HR (1)' }).click();
+  await expect(nav.getByRole('button', { name: 'Policies (1)', exact: true })).toHaveCount(0);
+  await nav.getByRole('button', { name: 'Expand HR (1)' }).click();
+  await page.getByRole('button', { name: /More actions for/ }).click();
+  await page.getByRole('menuitem', { name: 'Details and version' }).click();
+  const details = page.getByRole('dialog', { name: 'Source details' });
+  await details.getByLabel('Folder', { exact: true }).selectOption('HR');
+  await details.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(details).toHaveCount(0);
+  await nav.getByRole('button', { name: 'HR (1)', exact: true }).click();
+  await expect(page.locator('.source-row')).toContainText('folder policy');
+  await page.reload();
+  await page.getByRole('navigation', { name: 'Knowledge folders' }).getByRole('button', { name: 'HR (1)', exact: true }).click();
+  await expect(page.locator('.source-row')).toContainText('folder policy');
+});

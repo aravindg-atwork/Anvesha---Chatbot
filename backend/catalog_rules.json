@@ -1,0 +1,25 @@
+{
+  "version": "rules-v1",
+  "categories": [
+    {"label": "People & policies", "terms": ["employee", "annual leave", "benefits", "onboarding", "human resources", "recruitment"]},
+    {"label": "Products & services", "terms": ["product", "catalog", "warranty", "pricing", "installation", "specification"]},
+    {"label": "Procedures & guides", "terms": ["procedure", "step by step", "troubleshooting", "instructions", "manual", "safety"]},
+    {"label": "Meetings & decisions", "terms": ["meeting", "minutes", "action items", "agenda", "decision", "attendees"]},
+    {"label": "Finance & billing", "terms": ["invoice", "payment", "expense", "reimbursement", "billing", "purchase order"]},
+    {"label": "Contracts & agreements", "terms": ["agreement", "contract", "termination", "liability", "confidentiality", "renewal"]},
+    {"label": "Learning & research", "terms": ["research", "syllabus", "lecture", "curriculum", "methodology", "assignment"]}
+  ],
+  "topics": [
+    {"tag": "Annual leave", "terms": ["annual leave", "paid leave"], "question": "What annual leave information does this source provide?"},
+    {"tag": "Benefits", "terms": ["benefits", "insurance coverage"], "question": "What benefits are described in this source?"},
+    {"tag": "Warranty", "terms": ["warranty", "guarantee"], "question": "What warranty information is provided in this source?"},
+    {"tag": "Setup", "terms": ["installation", "setup", "power cable"], "question": "What setup instructions are provided in this source?"},
+    {"tag": "Pricing", "terms": ["pricing", "unit price", "price list"], "question": "What pricing information does this source contain?"},
+    {"tag": "Contact details", "terms": ["contact", "help desk", "support email"], "question": "What contact details are listed in this source?"},
+    {"tag": "Eligibility", "terms": ["eligibility", "eligible", "admission requirements"], "question": "What eligibility requirements are described here?"},
+    {"tag": "Action items", "terms": ["action items", "next steps"], "question": "What action items or next steps are recorded here?"},
+    {"tag": "Payment", "terms": ["payment", "due date", "invoice"], "question": "What payment information is recorded in this source?"},
+    {"tag": "Returns", "terms": ["return policy", "refund", "replacement"], "question": "What does this source say about returns or replacements?"},
+    {"tag": "Research", "terms": ["research", "methodology", "findings"], "question": "What research findings or methods are described here?"}
+  ]
+}

@@ -26,6 +26,9 @@ function referenceDetail(c: Citation): string | null {
       ? `“PDF page” is the page’s position in the file. “Printed page” is the number printed on the page itself.`
       : 'Page position in the PDF file. This file does not store separate printed page numbers.';
   }
+  if (c.locator.kind === 'sheet') return 'Sheet and cell range as extracted from the workbook. Cached formula values are used.';
+  if (c.locator.kind === 'slide') return 'Slide position in the presentation.';
+  if (c.locator.kind === 'media') return 'Approximate timestamps from an AI speech transcript. Verify against the original recording.';
   if (c.locator.kind === 'faq') return `Question and answer entry ${c.locator.code}: “${c.locator.question}”`;
   if (c.locator.kind === 'section') return 'Section heading as it appears in the document.';
   if (c.locator.kind === 'paragraph') return 'This document has no headings, so the paragraph position is used.';
@@ -84,6 +87,7 @@ export function SourceInspector({
           </span>
           <strong style={{ fontSize: '1.1rem', overflowWrap: 'anywhere' }}>{c.sourceTitle}</strong>
           <span>{formatLocator(c.locator)}</span>
+          {src?.sourceUrl && /^https:\/\/drive\.google\.com\//.test(src.sourceUrl) && <a href={src.sourceUrl} target="_blank" rel="noopener noreferrer">Open original in Google Drive</a>}
           <span className="faint small">{referenceDetail(c)}</span>
         </div>
         {outdated && (

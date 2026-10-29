@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { AlertCircle, CalendarClock, FileText, FileWarning, PenLine, CheckCircle2, Eye, Loader2, MoreHorizontal, RefreshCw, Replace, Settings2, Trash2 } from 'lucide-react';
 import type { Assistant, Source } from '../../../domain/types';
-import { dispatch } from '../../../domain/store';
+import { api } from '../../../lib/api';
+import { dispatch, flushRemote, isRemoteSession } from '../../../domain/store';
 import * as op from '../../../domain/operations';
 import { formatLocator, isOutdated, supersededIds } from '../../../domain/knowledge';
 import { ACCEPTED } from '../../../domain/ingest';
@@ -57,6 +58,8 @@ export function PreviewModal({ s, onClose }: { s: Source; onClose: () => void })
 
 function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () => void }) {
   const [form, setForm] = useState({
+    folderPath: s.folderPath ?? '',
+    tags: (s.tags ?? []).join(', '),
     title: s.title,
     visibility: s.visibility,
     version: s.version ?? '',
@@ -65,9 +68,17 @@ function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () 
     supersedes: s.supersedes ?? '',
   });
   const others = a.draft.sources.filter((x) => x.id !== s.id);
-  const save = () => {
+  const save = async () => {
+    if (s.serverManaged && isRemoteSession() && form.folderPath !== (s.folderPath ?? '')) {
+      try {
+        await flushRemote();
+        await api(`/api/projects/${a.id}/sources/${s.id}/folder`, { method: 'PATCH', body: JSON.stringify({ folder: form.folderPath }) });
+      } catch (e) { toast(e instanceof Error ? e.message : 'Could not move file.'); return; }
+    }
     dispatch((st) =>
       op.updateSource(st, a.id, s.id, {
+        folderPath: form.folderPath,
+        tags: [...new Set(form.tags.split(',').map(tag => tag.trim().slice(0, 40)).filter(Boolean))].slice(0, 12),
         title: form.title.trim() || s.title,
         visibility: form.visibility,
         version: form.version.trim() || undefined,
@@ -93,6 +104,9 @@ function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () 
       }
     >
       <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
+        <Field label="Folder" hint="Move this source to another folder.">{id => <select id={id} className="select" value={form.folderPath} onChange={e => setForm({ ...form, folderPath: e.target.value })}><option value="">Unfiled</option>{[...new Set([...(a.draft.folders ?? []), ...a.draft.sources.map(x => x.folderPath ?? '')].flatMap(path => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))))].filter(Boolean).sort().map(path => <option key={path} value={path}>{path}</option>)}</select>}</Field>
+        {s.documentLabel && <p className="small muted">Suggested document label: <strong>{s.documentLabel}</strong>. Automatically organized from the extracted content.</p>}
+        <Field label="Your tags" optional hint="Separate tags with commas. Your tags stay when a document updates.">{id => <input id={id} className="input" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="Product, Support, Onboarding" />}</Field>
         <Field label="Title">{(id) => <input id={id} className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />}</Field>
         <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0, '--gap': '10px' } as React.CSSProperties}>
           <legend className="field-label" style={{ marginBottom: 10 }}>
@@ -105,7 +119,7 @@ function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () 
             ] as const
           ).map(([v, t, d]) => (
             <label key={v} className="check">
-              <input type="radio" name="vis" checked={form.visibility === v} onChange={() => setForm({ ...form, visibility: v })} />
+              <input type="radio" name="vis" checked={form.visibility === v} disabled={!!s.driveFileId && v === 'public'} onChange={() => setForm({ ...form, visibility: v })} />
               <span>
                 <strong>{t}</strong>
                 <br />
@@ -149,6 +163,7 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
   const [confirmRemove, setConfirmRemove] = useState(false);
   const outdated = isOutdated(s.reviewBy);
   const isFile = s.origin !== 'written';
+  const canReplace = isFile && !s.driveFileId;
 
   return (
     <li className="source-row">
@@ -160,11 +175,15 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
         <div className="source-meta">
           <StatusPill s={s} />
           <span>{s.fileType === 'Written' ? 'Written information' : `${s.fileType === 'Other' ? 'Unsupported' : s.fileType} file${s.size ? ` · ${sizeLabel(s.size)}` : ''}`}</span>
-          {s.status === 'ready' && <span>{s.chunks.length} passages</span>}
+          {s.status === 'ready' && <span>{s.chunks.length} {s.chunks.length === 1 ? 'passage' : 'passages'}</span>}
+          <span>{s.folderPath || 'Unfiled'}</span>
+          {s.driveFileId && <span>Google Drive</span>}
+          {s.documentLabel && <span>{s.documentLabel}</span>}
           <span>{s.visibility === 'public' ? 'Public' : 'Internal only'}</span>
           {s.version && <span>Version {s.version}</span>}
           {s.effectiveDate && <span>From {formatDate(s.effectiveDate)}</span>}
         </div>
+        {s.status === 'ready' && !!(s.tags?.length || s.autoTags?.length) && <div className="source-auto-tags" aria-label="Document tags">{[...new Set([...(s.tags ?? []), ...(s.autoTags ?? [])])].slice(0, 4).map(tag => <span key={tag}>{tag}</span>)}</div>}
         {s.status === 'attention' && s.attention && (
           <p className="small" style={{ color: 'var(--danger)', marginTop: 6 }}>
             {s.attention}
@@ -222,7 +241,7 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
               <button role="menuitem" className="btn btn-ghost btn-sm" style={{ justifyContent: 'flex-start' }} onClick={() => (setMenu(false), setDetails(true))}>
                 <Settings2 size={16} /> Details and version
               </button>
-              {isFile && (
+              {canReplace && (
                 <FilePicker
                   variant="ghost"
                   size="sm"
@@ -267,11 +286,11 @@ function SourceRow({ a, s, replacedBy }: { a: Assistant; s: Source; replacedBy?:
   );
 }
 
-export function SourceList({ a }: { a: Assistant }) {
+export function SourceList({ a, folder, sources }: { a: Assistant; folder?: string; sources?: Source[] }) {
   const superseded = supersededIds(a.draft.sources);
   return (
     <ul className="source-list" aria-label="Sources">
-      {a.draft.sources.map((s) => (
+      {(sources ?? a.draft.sources).filter(s => folder === undefined || folder === '*' || (s.folderPath ?? '') === folder).map((s) => (
         <SourceRow key={s.id} a={a} s={s} replacedBy={superseded.has(s.id) ? a.draft.sources.find((x) => x.supersedes === s.id) : undefined} />
       ))}
     </ul>

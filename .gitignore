@@ -13,3 +13,5 @@ test-results
 test-results-local
 playwright-report
 .taste-skill
+.shots/
+.jury/

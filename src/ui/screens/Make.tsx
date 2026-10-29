@@ -7,7 +7,7 @@ import { StepHeading, type StepProps } from '../App';
 import { AVATAR_KEYS, Avatar, AvatarGlyph } from '../components/avatar';
 import { starterQuestionsFor, suggestedQuestions } from '../chat/suggestions';
 
-export const COLOURS = ['#1d3a5f', '#2e6a4a', '#c8502a', '#7a3b2e', '#4b3f72', '#0f6d7a', '#23211e'];
+export const COLOURS = ['#3a0f34', '#eaaa00', '#dde3e8', '#2e6a4a', '#c8502a', '#4b3f72', '#23211e'];
 const AVATARS = ['', ...AVATAR_KEYS];
 
 export function MakeStep({ assistant: a, stepNumber, nextLabel, onNext, onBack }: StepProps) {

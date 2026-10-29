@@ -1,0 +1,87 @@
+/* Shared brand roles. Keep these exact three anchors across every app surface. */
+:root {
+  --brand-paper: #DDE3E8;
+  --brand-ink: #3A0F34;
+  --brand-highlight: #EAAA00;
+  --bg: var(--brand-paper);
+  --bg-deep: #cbd3db;
+  --surface: #fff;
+  --surface-muted: #f4f6f8;
+  --text: var(--brand-ink);
+  --text-muted: #665161;
+  --text-faint: #665161;
+  --border: #cbd3db;
+  --border-strong: #a5a2ac;
+  --accent: var(--brand-ink);
+  --accent-hover: #4e1946;
+  --accent-ink: #fff;
+  --accent-soft: #eee6ed;
+  --accent-line: #cbb4c7;
+  --shell: var(--brand-ink);
+  --shell-raised: #4e1946;
+  --shell-text: var(--brand-paper);
+  --shell-muted: #cbbdca;
+  --mark: var(--brand-highlight);
+  --mark-ink: var(--brand-ink);
+  --frame: var(--brand-paper);
+  --frame-active: #eee6ed;
+  --sheet-edge: var(--border);
+  --card-edge: var(--border);
+  --rule: var(--border);
+  --control-edge: var(--border-strong);
+  --studio-paper: var(--brand-paper);
+  --studio-ink: var(--brand-ink);
+  --studio-gold: var(--brand-highlight);
+  --studio-rule: var(--border);
+  --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-ink);
+  --shadow-sm: 0 1px 2px #3a0f340a;
+  --shadow: 0 1px 2px #3a0f340a, 0 10px 28px -16px #3a0f342e;
+  --shadow-lg: 0 30px 70px -30px #3a0f3459;
+}
+
+.btn-primary { background: var(--brand-ink); color: #fff; box-shadow: 0 3px 8px -4px #3a0f3455; }
+.btn-primary:hover { background: var(--accent-hover); }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--brand-ink); box-shadow: 0 0 0 3px #3a0f3418; }
+.journey-button-gold { background: var(--brand-highlight); color: var(--brand-ink); }
+.journey-button-gold:hover { background: #f2b918; }
+.app-frame .sidebar { background: var(--brand-paper); }
+.studio-shell .sidebar, .entry-art { background: var(--brand-ink); color: var(--brand-paper); }
+.app-topbar { background: #dde3e8e6; }
+.side-row.current, .side-row[aria-current] { background: var(--accent-soft); color: var(--brand-ink); }
+.studio-nav-item.is-active { background: var(--brand-highlight); color: var(--brand-ink); }
+.studio-nav-item.is-active svg, .studio-nav-item.is-active > span:last-child { color: var(--brand-ink); }
+.studio-nav-item:not(.is-active), .studio-collection-empty, .studio-nav-label, .studio-nav-label button,
+.studio-account small, .studio-workspace-switch > div > span { color: #d2c1cf; }
+.studio-nav-item:not(.is-active) > span:last-child { color: #d2c1cf; }
+.studio-account strong, .studio-workspace-switch select { color: var(--brand-paper); }
+.studio-account > span, .studio-header-avatar { background: var(--brand-highlight); color: var(--brand-ink); }
+.entry-art-copy p, .entry-art-edition { color: #d2c1cf; }
+.entry-art .atlas-node small, .entry-art-copy > div { color: #d2c1cf; }
+.entry-error { color: var(--danger); }
+.entry-art-copy .journey-kicker, .entry-art-copy h2 em { color: var(--brand-highlight); }
+.knowledge-folder-sidebar { background: var(--surface-muted); }
+.branched-menu__item[aria-current] { background: var(--accent-soft); color: var(--brand-ink); }
+.branched-menu__section[data-active] > .branched-menu__branch path { stroke: var(--brand-highlight); }
+.branched-menu__item[aria-current] { box-shadow: inset 3px 0 var(--brand-highlight); }
+.auth-experience { background: var(--brand-ink); }
+.auth-shader { background: radial-gradient(ellipse at 70% 25%, #6e2d63, #3a0f34 45%, #250922 90%); }
+.launch-hero h1 em, .launch-hero h1 strong { color: var(--brand-ink); }
+.launch-final .journey-kicker, .launch-final > span:last-child { color: #d2c1cf; }
+/* Status colours retain their separate success, warning and error meanings. */
+.pill-ok { color: var(--ok); background: var(--ok-soft); }
+.pill-danger { color: var(--danger); background: var(--danger-soft); }
+:root .ui-tcc, :root .ui-tcc-group {
+  --ui-tcc-strong: var(--brand-ink);
+  --ui-tcc-ink: var(--text);
+  --ui-tcc-text: var(--text-muted);
+  --ui-tcc-muted: var(--text-faint);
+  --ui-tcc-icon: var(--text-muted);
+  --ui-tcc-line: var(--border);
+  --ui-tcc-wash: var(--surface-muted);
+  --ui-tcc-accent: var(--brand-ink);
+  --ui-tcc-str: #6e2d63;
+  --ui-tcc-num: #805b00;
+  --ui-tcc-lit: #6e2d63;
+}
+:root .ui-tcc__head:focus-visible, :root .ui-tcc-group__head:focus-visible,
+:root .ui-tcc__copy:focus-visible { outline-color: var(--brand-ink); }

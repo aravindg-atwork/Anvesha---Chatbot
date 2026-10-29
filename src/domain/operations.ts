@@ -1,3 +1,4 @@
+import { describeSource } from './catalog';
 // Pure state operations. Each takes the current AppState and returns a new one.
 // Kept free of React and storage so they can be unit tested.
 import type {
@@ -72,7 +73,7 @@ function newAssistant(orgId: string, isSample: boolean): Assistant {
     share: {
       audience: null,
       channel: null,
-      widget: { color: '#1d3a5f', position: 'right', mode: 'floating', greeting: '' },
+      widget: { color: '#3a0f34', position: 'right', mode: 'floating', greeting: '' },
     },
   };
 }
@@ -244,7 +245,9 @@ function recheckConflicts(a: Assistant) {
 
 export function addSource(s: AppState, id: string, source: Source): AppState {
   return withAssistant(s, id, (a) => {
-    a.draft.sources.push(clone(source));
+    const added = clone(source);
+    if (added.status === 'ready' && !added.serverManaged) Object.assign(added, describeSource(added));
+    a.draft.sources.push(added);
     if (source.status === 'ready') recheckConflicts(a);
   }, true);
 }
@@ -254,6 +257,7 @@ export function updateSource(s: AppState, id: string, sourceId: string, patch: P
     const src = a.draft.sources.find((x) => x.id === sourceId);
     if (!src) return;
     Object.assign(src, clone(patch));
+    if (src.status === 'ready' && !src.serverManaged && (patch.chunks || patch.status)) Object.assign(src, describeSource(src));
     if (patch.chunks || patch.status) recheckConflicts(a);
   }, true);
 }

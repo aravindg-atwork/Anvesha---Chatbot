@@ -61,8 +61,20 @@ The current project is already configured; reinitialization is unnecessary. Revi
 - Animation pauses offscreen and when the tab is hidden; rendering is capped at two million pixels.
 - Reduced-motion mode renders a static frame and disables pointer animation.
 - `dark-mono-demo.tsx` contains the standalone shader example.
-- The optional `colors` prop accepts up to eight hex colours; the default preserves the supplied blue recipe.
+- The optional `colors` prop accepts up to eight hex colours; the default uses the aubergine, silver and marigold palette.
 
 The initial theme keeps the existing navy, ivory and amber, centralized as `--brand-ink`, `--brand-paper` and `--brand-highlight` in `product.css`, pending the exact requested palette. No stock images are needed for these canvas and glass compositions.
 
 References: [Tailwind with Vite](https://tailwindcss.com/docs/installation/using-vite), [shadcn Vite setup](https://ui.shadcn.com/docs/installation/vite), [shadcn components.json](https://ui.shadcn.com/docs/components-json), [affectUI component documentation](https://www.affectui.com/docs).
+
+## Current brand palette
+
+The full app uses Ice Silver (`#DDE3E8`) for the canvas, Deep Aubergine (`#3A0F34`) for primary text, navigation and controls, and Marigold (`#EAAA00`) for highlights and selected navigation. Shared role tokens are in `src/styles/brand.css`, loaded after screen styles. Supporting shades provide readable secondary text and borders; success, warning and error colours retain their meanings. Authentication artwork, shader colours, project screens, knowledge folders, processing cards and chat inherit the same palette.
+
+## Glass surfaces and interactive scenes
+
+`src/styles/glass.css` defines silver, aubergine and marigold frosted materials, with blur restricted to outer surfaces and simpler mobile rendering. Reading surfaces stay dense enough for clear text.
+
+The supplied Frost Cloud is integrated into the entry-screen knowledge map and empty project state, with an additional `brand` color variant. It uses a native button for keyboard interactions, React 18 compatible CSS imports, unique SVG IDs, live reduced-motion preference handling, and offscreen/hidden-tab animation suspension.
+
+The supplied Integration Beam explains the real input-to-answer workflow on the landing page. Its labels describe documents, images, Q&A, passages, search and citations. Controls pause the illustration only; they do not connect services or change project processing. Curves are measured from the tile positions and reflow vertically in narrow containers.

@@ -93,6 +93,7 @@ export function TryStep({ assistant: a, org, stepNumber, nextLabel, onNext, onBa
 
       <div className={`try-layout ${inspected ? 'with-sources' : ''}`}>
         <ChatPanel
+          initialQuestion={new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('question')?.slice(0, 2000)}
           header={
             <div className="chat-head">
               <span className="row" style={{ '--gap': '10px' } as React.CSSProperties}>

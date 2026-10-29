@@ -1,0 +1,19 @@
+.branched-menu { color: var(--text); width: 100%; font-size: 14px; }
+.branched-menu__row { display: flex; align-items: center; min-height: 36px; }
+.branched-menu__toggle { flex: 0 0 22px; border: 0; background: none; color: inherit; text-align: center; }
+.branched-menu__item { display: flex; align-items: center; gap: 8px; border: 0; background: none; color: inherit; padding: 8px; text-align: left; border-radius: 6px; cursor: pointer; min-width: 0; }
+.branched-menu__item span { overflow-wrap: anywhere; }
+.branched-menu__item[aria-current] { background: var(--surface-hover, #eee6ed); color: var(--accent, #3a0f34); font-weight: 600; }
+.branched-menu__section { position: relative; }
+.branched-menu__branch { display: none; position: absolute; left: -24px; top: 0; overflow: visible; pointer-events: none; }
+.branched-menu__branch path { fill: none; stroke: var(--border, #aaa); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 48; stroke-dashoffset: 0; transition: stroke 400ms ease; }
+.branched-menu__section[data-active] > .branched-menu__branch path { stroke: var(--accent, #3a0f34); animation: bm-draw 400ms ease; }
+.branched-menu__children { margin-left: 14px; padding-left: 24px; border-left: 1.5px solid var(--border, #aaa); animation: bm-unfold 300ms ease; }
+.branched-menu__children > .branched-menu__section > .branched-menu__branch { display: block; }
+@keyframes bm-draw { from { stroke-dashoffset: 48; } to { stroke-dashoffset: 0; } }
+@keyframes bm-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .branched-menu * { animation: none !important; transition: none !important; } }
+.branched-menu button:focus-visible { outline: 2px solid var(--accent, #3a0f34); outline-offset: 2px; }
+.knowledge-folders { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.knowledge-folder-sidebar { padding: 16px; border: 1px solid var(--border, #ddd); border-radius: 12px; }
+@media (max-width: 700px) { .knowledge-folders { grid-template-columns: 1fr; } }

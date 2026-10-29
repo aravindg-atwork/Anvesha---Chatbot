@@ -46,7 +46,8 @@ test('offline demo: create a workspace and project, and upload real files with t
   await dialog.getByRole('button', { name: 'Create project' }).click();
 
   // Upload — a real click on "Choose files" opens the browser's file chooser.
-  await expect(page.getByRole('heading', { name: 'Give your assistant the information it needs.' })).toBeVisible();
+  // The first development-server visit also compiles the lazy upload route.
+  await expect(page.getByRole('heading', { name: 'Give your assistant the information it needs.' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Admissions Helper').first()).toBeVisible();
   const chooser = page.waitForEvent('filechooser');
   await page.getByText('Choose files', { exact: true }).click();
@@ -77,7 +78,7 @@ test('offline demo: create a workspace and project, and upload real files with t
   await page.reload();
   await expect(step(page, 'Training')).toHaveAttribute('aria-current', 'step');
   await step(page, 'Upload').click();
-  await expect(rows.filter({ hasText: 'VayuTech Employee Handbook' }).first()).toContainText('Ready');
+  await expect(rows.filter({ hasText: 'VayuTech Employee Handbook' }).filter({ hasText: 'Ready' }).first()).toContainText('Ready');
 
   // Projects list shows the project and its progress.
   await page.getByRole('link', { name: 'Projects' }).click();

@@ -97,6 +97,14 @@ export function formatLocator(l: Locator): string {
       return l.pageLabel ? `PDF page ${l.pageIndex} · printed page “${l.pageLabel}”` : `Page ${l.pageIndex}`;
     case 'section':
       return `Section: ${l.heading}`;
+    case 'sheet':
+      return `${l.sheet} / ${l.range}`;
+    case 'slide':
+      return `Slide ${l.slide}`;
+    case 'media': {
+      const stamp = (seconds: number) => `${Math.floor(seconds / 60)}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`;
+      return `${stamp(l.startSeconds)} - ${stamp(l.endSeconds)} (approximate)`;
+    }
     case 'paragraph':
       return `Paragraph ${l.ordinal}`;
     case 'faq':

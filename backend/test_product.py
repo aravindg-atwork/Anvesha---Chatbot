@@ -62,6 +62,39 @@ class ProductTests(unittest.TestCase):
         with connect() as db:
             db.execute("UPDATE jobs SET status='complete' WHERE id=?", (job_id,))
 
+    def test_upload_folder_move_and_path_safety(self):
+        from pathlib import Path
+        response = self.client.post('/api/projects/project-one/sources',
+            files={'file': ('nested.txt', b'Nested folder information.')}, data={'folder': 'HR/Policies'})
+        self.assertEqual(response.status_code, 200, response.text)
+        source = response.json()['source']
+        self.assertEqual(source['folderPath'], 'HR/Policies')
+        with connect() as db:
+            original = Path(db.execute('SELECT path FROM sources WHERE id=?', (source['id'],)).fetchone()['path'])
+        self.assertEqual(original.parent.name, 'Policies')
+        self.assertTrue(original.exists())
+        parsed = Path(str(original) + '.parsed.json')
+        parsed.write_text('{}')
+        endpoint = f"/api/projects/project-one/sources/{source['id']}/folder"
+        self.assertEqual(self.client.patch(endpoint, json={'folder': '../escape'}).status_code, 400)
+        with connect() as db:
+            db.execute("UPDATE jobs SET status='running' WHERE source_id=?", (source['id'],))
+        self.assertEqual(self.client.patch(endpoint, json={'folder': 'Archive'}).status_code, 409)
+        with connect() as db:
+            db.execute("UPDATE jobs SET status='complete' WHERE source_id=?", (source['id'],))
+        moved = self.client.patch(endpoint, json={'folder': 'Archive'})
+        self.assertEqual(moved.status_code, 200, moved.text)
+        self.assertFalse(original.exists())
+        with connect() as db:
+            target = Path(db.execute('SELECT path FROM sources WHERE id=?', (source['id'],)).fetchone()['path'])
+        self.assertTrue(target.exists())
+        self.assertTrue(Path(str(target) + '.parsed.json').exists())
+        state = self.client.get('/api/state').json()['state']
+        self.assertEqual(state['assistants'][0]['draft']['sources'][0]['folderPath'], 'Archive')
+        self.client.post('/api/auth/signout')
+        self.client.post('/api/auth/signup', json={'email': 'other@example.com', 'name': 'Other', 'password': 'correct-password'})
+        self.assertEqual(self.client.patch(endpoint, json={'folder': ''}).status_code, 404)
+
     def test_password_sessions_and_revocation(self):
         with connect() as db:
             stored = db.execute('SELECT password FROM users').fetchone()['password']
@@ -136,7 +169,8 @@ class ProductTests(unittest.TestCase):
         source = result['sources'][0]
         self.assertEqual(source['fileType'], 'Image')
         self.assertIn('9 am', source['chunks'][0]['text'])
-        self.assertTrue(any(e['agent'] == 'OCR agent' for e in result['jobs'][0]['events']))
+        ingestion = next(job for job in result['jobs'] if job['id'] == upload['jobId'])
+        self.assertTrue(any(e['agent'] == 'OCR agent' for e in ingestion['events']))
 
     def test_server_extraction_cannot_be_overwritten_by_state_save(self):
         upload = self.upload()
