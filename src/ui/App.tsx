@@ -16,7 +16,8 @@ import { hasUnpublishedChanges } from '../domain/publish';
 import { Redirect, match, navigate, usePath } from './router';
 import { BrandMark, Button, Notice, Toasts } from './components/ui';
 import { Avatar } from './components/avatar';
-import { suggestedQuestions } from './chat/suggestions';
+import { WorkspaceDock } from './components/WorkspaceDock';
+import { starterQuestionsFor } from './chat/suggestions';
 export { Avatar, AvatarGlyph, AVATAR_KEYS } from './components/avatar';
 const Landing = lazy(() => import('./screens/Landing').then(module => ({ default: module.Landing })));
 const AuthScreen = lazy(() => import('./screens/Auth').then(module => ({ default: module.AuthScreen })));
@@ -187,14 +188,33 @@ export function AppFrame({ sidebar, topbar, children, className = '' }: { sideba
   const [open, setOpen] = useState(false);
   const path = usePath();
   useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    if (!open) return;
+    const panel = document.getElementById('workspace-navigation');
+    panel?.querySelector<HTMLElement>('a,button,select')?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setOpen(false); document.querySelector<HTMLButtonElement>('.workspace-dock button[aria-controls]')?.focus(); }
+      if (event.key === 'Tab' && panel) {
+        const targets = Array.from(panel.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),summary')).filter(element => element.getClientRects().length);
+        const first = targets[0], last = targets.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [open]);
   return (
-    <div className={`page ${className}`}>
+    <div className={`page dock-workspace ${className}`}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
       <DemoStrip />
       <div className={`app-frame ${open ? 'menu-open' : ''}`}>
         <aside
+          id="workspace-navigation"
+          role={open ? 'dialog' : undefined}
+          aria-modal={open || undefined}
           className="sidebar"
           aria-label="Navigation"
           onClick={(e) => {
@@ -202,6 +222,7 @@ export function AppFrame({ sidebar, topbar, children, className = '' }: { sideba
             if ((e.target as HTMLElement).closest('a, button')) setOpen(false);
           }}
         >
+          <button type="button" className="workspace-drawer-close" onClick={() => { setOpen(false); document.querySelector<HTMLButtonElement>('.workspace-dock button[aria-controls]')?.focus(); }}>Close menu <span aria-hidden="true">×</span></button>
           {sidebar}
         </aside>
         {open && <div className="menu-scrim" onClick={() => setOpen(false)} aria-hidden />}
@@ -213,6 +234,7 @@ export function AppFrame({ sidebar, topbar, children, className = '' }: { sideba
         </header>
         <div className="app-sheet">{children}</div>
       </div>
+      <WorkspaceDock path={path} menuOpen={open} onMenu={() => setOpen(value => !value)} />
       <Toasts />
     </div>
   );
@@ -298,7 +320,7 @@ export function ProjectShell({ a, org, current, children }: { a: Assistant; org:
 }
 
 function ProjectQuestionBar({ a }: { a: Assistant }) {
-  const questions = suggestedQuestions(a.draft.sources, a.draft.faqs, a.isSample, 3);
+  const questions = starterQuestionsFor(a.draft.starterQuestions, a.draft.sources, a.draft.faqs, a.isSample, 3);
   if (!questions.length) return null;
   return <aside className="project-question-bar" aria-label="Suggested questions from your sources">
     <strong>Ask about your sources</strong>

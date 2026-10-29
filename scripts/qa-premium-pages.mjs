@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -36,16 +36,28 @@ try {
   await page.goto(`${base}/#/demo`);
   await page.getByRole('button', { name: /Ready-to-test sample/ }).click();
   const tryUrl = page.url();
-  await page.getByRole('link', { name: 'All projects', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Workspace dock' }).getByRole('link', { name: 'Projects', exact: true }).click();
   const projectsUrl = page.url();
   for (const [prefix, width, height] of [['d', 1440, 1000], ['m', 390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.goto(projectsUrl); await page.locator('.studio-project-open').first().waitFor(); await capture(`${prefix}-projects`);
+    await page.getByRole('navigation', { name: 'Workspace dock' }).getByRole('button', { name: 'Menu' }).click();
+    await page.locator('#workspace-navigation').waitFor({ state: 'visible' });
+    await capture(`${prefix}-drawer`);
+    await page.keyboard.press('Escape');
+    if (await page.locator('#workspace-navigation').isVisible()) throw new Error('Escape must close the workspace drawer');
     await page.goto(tryUrl); await page.getByRole('textbox', { name: 'Your question' }).waitFor(); await capture(`${prefix}-chat`);
+    const starter = page.locator('.project-question-bar button').first();
+    const starterText = await starter.textContent();
+    await starter.click();
+    await expect(page.getByRole('textbox', { name: 'Your question' })).toHaveValue(starterText ?? '');
     // A demo project exercises real settings forms without a private account.
     const projectId = new URL(page.url()).hash.match(/\/p\/([^/]+)/)?.[1];
     if (projectId) { await page.goto(`${base}/#/p/${projectId}/settings`); await page.getByRole('heading', { level: 1 }).waitFor(); await capture(`${prefix}-settings`); }
   }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(projectsUrl); await page.locator('.studio-project-open').first().waitFor(); await capture('r-projects');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   for (const [prefix, width, height] of [['d', 1440, 1000], ['m', 390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.goto(`${base}/#/workspace/new`);

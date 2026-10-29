@@ -12,7 +12,6 @@ import { refreshModelStatus, useModelStatus } from '../chat/modelStatus';
 import { api } from '../../lib/api';
 import { FaqEditor } from './knowledge/FaqManager';
 import { StepHeading, projectPath, type StepProps } from '../App';
-import { starterQuestionsFor } from '../chat/suggestions';
 
 function ImproveDialog({ onClose, onChoose }: { onClose: () => void; onChoose: (k: 'faq' | 'behaviour' | 'source') => void }) {
   const opts = [
@@ -139,7 +138,7 @@ export function TryStep({ assistant: a, org, stepNumber, nextLabel, onNext, onBa
           handover={d.handover}
           orgName={org.name}
           greeting={d.greeting}
-          suggestions={starterQuestionsFor(d.starterQuestions, d.sources, d.faqs, a.isSample, 5)}
+          suggestions={[]}
           onViewSources={(m, n) => setInspect({ messageId: m.id, n: n ?? m.answer!.citations[0]?.n ?? 1 })}
           activeMessageId={inspect?.messageId}
           activeCitation={inspect?.n}

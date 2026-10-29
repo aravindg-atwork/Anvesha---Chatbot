@@ -9,6 +9,7 @@ import './styles/journey.css';
 import './styles/brand.css';
 import './styles/glass.css';
 import './styles/premium.css';
+import './styles/workspace.css';
 import { App } from './ui/App';
 import { initializeSession } from './domain/store';
 

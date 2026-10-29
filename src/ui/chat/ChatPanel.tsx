@@ -91,6 +91,9 @@ export function ChatPanel(p: ChatPanelProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const empty = p.messages.length === 0;
+  useEffect(() => {
+    if (p.initialQuestion) { setDraft(p.initialQuestion); inputRef.current?.focus(); }
+  }, [p.initialQuestion]);
 
   useEffect(() => {
     const el = bodyRef.current;

@@ -69,6 +69,10 @@ Run production builds, real desktop/mobile workflows, keyboard and reduced-motio
 ## Expanded scope
 
 The user expanded the brief to the full website and inside application. The same materials now cover the public navigation and product preview, sign-in and onboarding, project library, chat and source inspector, and modal/settings surfaces through `src/styles/premium.css`. Upload and Training retain their own more specific workspace composition. Existing functionality and the user-selected palette stay central.
+# Full-width workspace and floating dock
+
+The signed-in workspace now uses the existing React/TypeScript stack with a full-width desk, quiet silver surfaces and a compact aubergine dock. Permanent left navigation and right overview columns consumed space; their controls now live in an on-demand drawer and a compact row of real workspace counts. The dock is the signature interaction: direct project destinations, a marigold current state, keyboard focus and restrained lift on hover. Phone navigation retains visible labels. Existing workspace switching, collection management, account controls and project settings stay available in the drawer.
+
 # Demo retrieval and cloud identity
 
 The supplied frosted cloud is now the animated Anvesha brand mark, with the same silver, aubergine and marigold palette. It remains decorative inside navigation links, avoiding nested interactive controls. Motion pauses offscreen, in hidden tabs and under reduced-motion preferences.
