@@ -81,6 +81,67 @@ class SourceFolder(BaseModel):
     folder: str = Field(max_length=240)
 
 
+class RenameFolder(BaseModel):
+    folder: str = Field(min_length=1, max_length=240)
+    name: str = Field(min_length=1, max_length=60)
+
+
+@router.patch('/{project_id}/folders/rename')
+def rename_folder(project_id: str, body: RenameFolder, user=Depends(current_user)):
+    from pathlib import Path
+    old = folder_path(body.folder)
+    name = folder_path(body.name)
+    if not old or not name or '/' in name:
+        raise HTTPException(400, 'Enter one folder name.')
+    new = '/'.join(old.split('/')[:-1] + [name])
+    remap = lambda value: new + value[len(old):] if value == old or value.startswith(old + '/') else value
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row = owned_project(db, project_id, user['id'])
+        project = json.loads(row['data'])
+        sources = db.execute('SELECT * FROM sources WHERE project_id=?', (project_id,)).fetchall()
+        folders = project['draft'].get('folders', []) + [json.loads(s['data']).get('folderPath', '') for s in sources]
+        if not any(f == old or f.startswith(old + '/') for f in folders):
+            raise HTTPException(404, 'Folder not found.')
+        if new != old and any(f == new or f.startswith(new + '/') for f in folders):
+            raise HTTPException(409, 'A folder with that name already exists.')
+        if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND status IN ('queued','running')", (project_id,)).fetchone():
+            raise HTTPException(409, 'Wait until document preparation and sync finish before renaming.')
+        root = (data_dir() / 'uploads' / user['id'] / project_id).resolve()
+        original, target = (root / old).resolve(), (root / new).resolve()
+        if not original.is_relative_to(root) or not target.is_relative_to(root):
+            raise HTTPException(400, 'Invalid folder.')
+        if new != old and target.exists():
+            raise HTTPException(409, 'That folder already exists on disk.')
+        moved = False
+        try:
+            if new != old and original.exists():
+                original.rename(target)
+                moved = True
+            for source_row in sources:
+                source = json.loads(source_row['data'])
+                source['folderPath'] = remap(source.get('folderPath', ''))
+                path = Path(source_row['path']).resolve()
+                if path.is_relative_to(original):
+                    path = target / path.relative_to(original)
+                db.execute('UPDATE sources SET path=?,data=? WHERE id=?', (str(path), json.dumps(source), source_row['id']))
+            draft = project['draft']
+            draft['folders'] = list(dict.fromkeys(remap(f) for f in folders if f))
+            for source in draft.get('sources', []):
+                source['folderPath'] = remap(source.get('folderPath', ''))
+            db.execute('UPDATE projects SET data=? WHERE id=?', (json.dumps(project), project_id))
+            link = db.execute('SELECT config FROM drive_links WHERE project_id=?', (project_id,)).fetchone()
+            if link:
+                config = json.loads(link['config'])
+                config['destination'] = remap(config.get('destination', ''))
+                db.execute('UPDATE drive_links SET config=? WHERE project_id=?', (json.dumps(config), project_id))
+        except Exception:
+            if moved:
+                target.rename(original)
+            raise
+    return {'folder': new}
+
+
 @router.patch('/{project_id}/sources/{source_id}/folder')
 def move_source(project_id: str, source_id: str, body: SourceFolder, user=Depends(current_user)):
     from pathlib import Path

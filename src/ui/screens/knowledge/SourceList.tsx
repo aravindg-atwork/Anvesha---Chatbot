@@ -68,6 +68,11 @@ function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () 
     supersedes: s.supersedes ?? '',
   });
   const others = a.draft.sources.filter((x) => x.id !== s.id);
+  const suggestedFolder = (a.draft.folders ?? []).filter(path => path !== s.folderPath).map(path => {
+    const terms = path.split('/').at(-1)!.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+    const content = [s.documentLabel, ...(s.autoTags ?? []), s.title, ...s.chunks.map(chunk => chunk.text.slice(0, 2000))].join(' ').toLowerCase();
+    return { path, score: terms.filter(term => content.includes(term)).length };
+  }).filter(item => item.score > 0).sort((left, right) => right.score - left.score)[0]?.path;
   const save = async () => {
     if (s.serverManaged && isRemoteSession() && form.folderPath !== (s.folderPath ?? '')) {
       try {
@@ -105,6 +110,7 @@ function DetailsModal({ a, s, onClose }: { a: Assistant; s: Source; onClose: () 
     >
       <div className="stack" style={{ '--gap': '18px' } as React.CSSProperties}>
         <Field label="Folder" hint="Move this source to another folder.">{id => <select id={id} className="select" value={form.folderPath} onChange={e => setForm({ ...form, folderPath: e.target.value })}><option value="">Unfiled</option>{[...new Set([...(a.draft.folders ?? []), ...a.draft.sources.map(x => x.folderPath ?? '')].flatMap(path => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))))].filter(Boolean).sort().map(path => <option key={path} value={path}>{path}</option>)}</select>}</Field>
+        {suggestedFolder && <div className="notice small"><p>Suggested folder: <strong>{suggestedFolder}</strong>. Its name matches this document's content. Review the selection, then Save to move.</p><Button size="sm" onClick={() => setForm({ ...form, folderPath: suggestedFolder })}>Use suggested folder</Button></div>}
         {s.documentLabel && <p className="small muted">Suggested document label: <strong>{s.documentLabel}</strong>. Automatically organized from the extracted content.</p>}
         <Field label="Your tags" optional hint="Separate tags with commas. Your tags stay when a document updates.">{id => <input id={id} className="input" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="Product, Support, Onboarding" />}</Field>
         <Field label="Title">{(id) => <input id={id} className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />}</Field>

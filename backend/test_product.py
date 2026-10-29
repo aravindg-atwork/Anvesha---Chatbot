@@ -29,6 +29,22 @@ def fake_embed(texts, query=False):
 
 
 class ProductTests(unittest.TestCase):
+    def test_rename_folder_preserves_nested_files_and_rejects_collisions(self):
+        from pathlib import Path
+        created = self.client.post('/api/projects/project-one/sources', data={'folder': 'Team/Policies'}, files={'file': ('policy.txt', b'Policy text')}).json()
+        self.assertIn('source', created)
+        with connect() as db:
+            db.execute("UPDATE jobs SET status='complete'")
+            old_path = Path(db.execute('SELECT path FROM sources WHERE id=?', (created['source']['id'],)).fetchone()['path'])
+        response = self.client.patch('/api/projects/project-one/folders/rename', json={'folder': 'Team', 'name': 'People'})
+        self.assertEqual(response.status_code, 200, response.text)
+        with connect() as db:
+            row = db.execute('SELECT path,data FROM sources WHERE id=?', (created['source']['id'],)).fetchone()
+            self.assertEqual(json.loads(row['data'])['folderPath'], 'People/Policies')
+            self.assertTrue(Path(row['path']).exists())
+            self.assertFalse(old_path.exists())
+        self.assertEqual(self.client.patch('/api/projects/project-one/folders/rename', json={'folder': 'People', 'name': '../escape'}).status_code, 400)
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, ChevronLeft, FileUp, FolderOpen, Search, SlidersHorizontal, ShieldCheck, MessagesSquare, PenLine, Sparkles } from 'lucide-react';
 import type { Source, Visibility } from '../../domain/types';
-import { dispatch, useAppState, isRemoteSession } from '../../domain/store';
+import { dispatch, flushRemote, useAppState, isRemoteSession } from '../../domain/store';
+import { api } from '../../lib/api';
 import * as op from '../../domain/operations';
 import { chunkPlainText } from '../../domain/ingest/txt';
 import { ACCEPTED, fileTypeOf } from '../../domain/ingest';
@@ -82,20 +83,46 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
   const csv = useFaqCsvImport(a);
   const [folder, setFolder] = useState('');
   const [newFolder, setNewFolder] = useState('');
+  const [parentFolder, setParentFolder] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const [folderBusy, setFolderBusy] = useState(false);
   const folders = [...new Set([...(d.folders ?? []), ...d.sources.map(s => s.folderPath ?? '')].flatMap(path => path.split('/').map((_, i, parts) => parts.slice(0, i + 1).join('/'))).filter(Boolean))].sort();
   const tree = (parent = ''): BranchedMenuItem[] => folders.filter(path => path.split('/').slice(0, -1).join('/') === parent).map(path => ({
     value: path, label: `${path.split('/').at(-1)} (${d.sources.filter(s => s.folderPath === path || s.folderPath?.startsWith(path + '/')).length})`, children: tree(path),
   }));
   const createFolder = () => {
-    const path = newFolder.trim();
-    if (!path || path.length > 240 || path.split('/').length > 10 || path.split('/').some(p => !/^[\p{L}\p{N}_ .()-]{1,60}$/u.test(p) || p === '.' || p === '..' || p !== p.trim() || p.endsWith('.'))) {
-      toast('Enter a folder path such as HR/Policies, up to 10 levels and 240 characters.'); return;
+    const path = [parentFolder, newFolder.trim()].filter(Boolean).join('/');
+    if (newFolder.includes('/') || !path || path.length > 240 || path.split('/').length > 10 || path.split('/').some(p => !/^[\p{L}\p{N}_ .()-]{1,60}$/u.test(p) || p === '.' || p === '..' || p !== p.trim() || p.endsWith('.'))) {
+      toast('Enter a folder name. To make a subfolder, choose its parent under Create inside.'); return;
     }
+    if (folders.includes(path)) return toast('That folder already exists. Choose it as your upload destination.');
     dispatch(st => op.updateDraft(st, a.id, { folders: [...new Set([...folders, path])] }));
     setFolder(path); setNewFolder('');
   };
 
+  const renameFolder = async () => {
+    const name = folderName.trim();
+    if (!name || !/^[\p{L}\p{N}_ .()-]{1,60}$/u.test(name) || name === '.' || name === '..' || name.endsWith('.')) return toast('Enter a valid folder name.');
+    const target = [...folder.split('/').slice(0, -1), name].join('/');
+    if (target !== folder && folders.includes(target)) return toast('A folder with that name already exists.');
+    const remap = (path: string) => path === folder || path.startsWith(folder + '/') ? target + path.slice(folder.length) : path;
+    setFolderBusy(true);
+    try {
+      if (isRemoteSession()) {
+        await flushRemote();
+        await api(`/api/projects/${a.id}/folders/rename`, { method: 'PATCH', body: JSON.stringify({ folder, name }) });
+      }
+      dispatch(st => op.updateDraft(st, a.id, { folders: folders.map(remap), sources: a.draft.sources.map(source => ({ ...source, folderPath: remap(source.folderPath ?? '') })) }));
+      setFolder(target); setParentFolder(remap(parentFolder)); setRenaming(false);
+      await flushRemote();
+      toast('Folder renamed, including its subfolders.');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not rename this folder.'); }
+    finally { setFolderBusy(false); }
+  };
+
   const handleFiles = (list: FileList | File[]) => {
+    if (!folder || folder === '*') { setBlocked('Name a folder or choose an existing folder before uploading.'); document.getElementById('knowledge-new-folder')?.focus(); return; }
     setBlocked(null);
     for (const f of Array.from(list)) {
       // CSVs are question-and-answer imports, with their own preview.
@@ -109,7 +136,7 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
   const hasSample = d.sources.some((s) => s.sampleKey);
   const readySources = d.sources.filter(source => source.status === 'ready').length;
   const attentionSources = d.sources.filter(source => source.status === 'attention').length;
-  const visibleSources = d.sources.filter(source => (folder === '*' || (source.folderPath ?? '') === folder)
+  const visibleSources = d.sources.filter(source => (folder === '*' || (source.folderPath ?? '') === folder || Boolean(folder && source.folderPath?.startsWith(folder + '/')))
     && (sourceFilter === 'all' || source.status === sourceFilter)
     && `${source.title} ${source.fileName ?? ''} ${source.fileType} ${source.documentLabel ?? ''} ${(source.autoTags ?? []).join(' ')} ${(source.tags ?? []).join(' ')}`.toLowerCase().includes(query.toLowerCase()))
     .sort((left, right) => sourceSort === 'name' ? left.title.localeCompare(right.title) : right.addedAt.localeCompare(left.addedAt));
@@ -125,8 +152,9 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
         <aside className="knowledge-rail" aria-label="Organize your knowledge">
           <div className="knowledge-rail-heading"><span><FolderOpen size={18} />Your folders</span><span>{folders.length}</span></div>
           <BranchedMenu active={folder} onSelect={setFolder} items={[{ value: '*', label: `All sources (${d.sources.length})` }, { value: '', label: `Unfiled (${d.sources.filter(source => !source.folderPath).length})` }, ...tree()]} />
-          <div className="knowledge-folder-create"><label className="field-label" htmlFor="knowledge-new-folder">Make room for an idea</label><input id="knowledge-new-folder" className="input" aria-label="New folder path" placeholder="e.g. Product/Guides" value={newFolder} onChange={e => setNewFolder(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createFolder(); }} /><Button size="sm" onClick={createFolder}>Create folder</Button></div>
-          <Field label="Upload destination" hint="New files and Drive imports go here.">{id => <select id={id} className="select" value={folder === '*' ? '' : folder} onChange={e => setFolder(e.target.value)}><option value="">Unfiled</option>{folders.map(path => <option key={path} value={path}>{path}</option>)}</select>}</Field>
+          <div className="knowledge-folder-create"><label className="field-label" htmlFor="knowledge-new-folder">{folders.length ? 'New folder' : 'Name your first folder'}</label><input id="knowledge-new-folder" className="input" aria-label="New folder name" placeholder="Your folder name" value={newFolder} onChange={e => setNewFolder(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') createFolder(); }} /><Field label="Create inside">{id => <select id={id} className="select" value={parentFolder} onChange={e => setParentFolder(e.target.value)}><option value="">Project (top level)</option>{folders.map(path => <option key={path} value={path}>{path}</option>)}</select>}</Field><Button size="sm" disabled={!newFolder.trim()} onClick={createFolder}>{parentFolder ? 'Create subfolder' : 'Create folder'}</Button></div>
+          <Field label="Upload destination" hint="Choose where your files belong.">{id => <select id={id} className="select" value={folder === '*' ? '' : folder} onChange={e => setFolder(e.target.value)}><option value="">Choose a named folder</option>{folders.map(path => <option key={path} value={path}>{path}</option>)}</select>}</Field>
+          {folder && folder !== '*' && <Button size="sm" onClick={() => { setFolderName(folder.split('/').at(-1) ?? ''); setRenaming(true); }}>Rename selected folder</Button>}
           <div className="knowledge-rail-note"><ShieldCheck size={18} /><p>Your information, organized your way.<span>Original sources stay linked to every passage.</span></p></div>
         </aside>
         <div className="knowledge-main">
@@ -134,7 +162,7 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
             <span className="intake-destination"><FolderOpen size={13} /> {folder && folder !== '*' ? folder : 'Your knowledge library'}</span>
             <IntakeArt />
             <h2>{over ? 'A good place to drop it.' : 'Good answers start with your files.'}</h2>
-            <p>Drop your documents here. Anvesha takes it from there.</p>
+            <p>{folder && folder !== '*' ? `Files will be added to ${folder}.` : 'Name a folder or select one before adding files.'}</p>
             <FilePicker variant="primary" accept={ACCEPTED} multiple onFiles={handleFiles} testId="file-input" icon={<FileUp size={17} />}>Choose files</FilePicker>
             <div className="intake-format-tags" aria-label="Supported document families"><span>PDF & Word</span><span>Spreadsheets</span><span>Slides</span><span>Images & scans</span><span>Audio & video</span></div>
             <span className="intake-limits">Documents up to 15 MB. Audio/video up to 10 MB with transcription consent.</span>
@@ -154,7 +182,7 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
               {visibleSources.length ? <SourceList a={a} sources={visibleSources} /> : <div className="knowledge-no-results"><Search size={24} /><p>{query || sourceFilter !== 'all' ? 'No sources match these filters.' : 'This folder is ready for your first file.'}</p>{(query || sourceFilter !== 'all') && <Button size="sm" onClick={() => { setQuery(''); setSourceFilter('all'); }}>Clear filters</Button>}</div>}
             </> : <div className="knowledge-library-empty"><FrostCloud background={false} color="brand" /><div><h3>A little empty. Full of possibilities.</h3><p>Your files will appear here, with clear status and a place of their own.</p></div></div>}
           </section>
-          <GoogleDrive projectId={a.id} destination={folder === '*' ? '' : folder} onRefresh={processing.refresh} />
+          {folder && folder !== '*' && <GoogleDrive projectId={a.id} destination={folder} onRefresh={processing.refresh} />}
           {!faqOpen && d.faqs.length > 0 && <div className="knowledge-faq-summary"><MessagesSquare size={18} /><span><strong>{d.faqs.length} questions and answers</strong><small>Part of your assistant?s knowledge</small></span><Button size="sm" onClick={() => setFaqOpen(true)}>Manage</Button></div>}
           {processing.error && <Notice tone="danger">{processing.error}</Notice>}
           {blocked && <Notice tone="warn">{blocked}</Notice>}
@@ -166,6 +194,7 @@ export function KnowledgeStep({ assistant: a, stepNumber, nextLabel, onNext, onB
         if (!ready) return setBlocked('Add at least one file that is ready, or a question and answer, to continue.');
         onNext();
       }}>{nextLabel}</Button></div>
+      {renaming && <Modal title="Rename folder" description="Files and subfolders stay together. Published answers keep their published source snapshot." onClose={() => setRenaming(false)} footer={<><Button onClick={() => setRenaming(false)}>Cancel</Button><Button variant="primary" disabled={folderBusy} onClick={() => void renameFolder()}>Save name</Button></>}><Field label="Folder name">{id => <input id={id} className="input" value={folderName} onChange={e => setFolderName(e.target.value)} autoFocus />}</Field><p className="small muted">{folder}</p></Modal>}
       {writing && (
         <WriteModal
           onClose={() => setWriting(false)}
