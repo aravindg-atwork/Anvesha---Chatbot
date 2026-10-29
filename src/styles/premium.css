@@ -1,3 +1,11 @@
+/* Keep document-based demo questions within reach as owners move through the project. */
+.project-question-bar { position:sticky; top:0; z-index:8; display:flex; align-items:center; gap:12px; padding:10px clamp(16px,3vw,40px); border-bottom:1px solid #3a0f3414; background:#f5f6f8ef; backdrop-filter:blur(16px); }
+.project-question-bar > strong { flex:none; color:var(--brand-aubergine); font-size:12px; }
+.project-question-bar > div { display:flex; gap:8px; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+.project-question-bar button { flex:none; max-width:min(340px,50vw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:7px 11px; border:1px solid #3a0f3426; border-radius:999px; background:#ffffffc9; color:var(--brand-ink); font:inherit; font-size:11px; cursor:pointer; }
+.project-question-bar button:hover { background:var(--glass-marigold); }
+@media(max-width:760px) { .project-question-bar { align-items:flex-start; flex-direction:column; gap:6px; padding:8px 14px; } .project-question-bar > div { width:100%; } }
+
 /* The same three materials from the first visit to the final answer. */
 :root { --premium-edge:#ffffffd9; --premium-hairline:#3a0f3414; --premium-muted:#665161; }
 :root { --ok:#1c5e3d; }

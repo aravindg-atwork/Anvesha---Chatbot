@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ArrowRight, ChevronLeft, FileSearch, Lock, MessageSquarePlus, RotateCcw, UserCog } from 'lucide-react';
+import { ArrowRight, ChevronLeft, FileSearch, Lock, MessageSquarePlus, RotateCcw, Trash2, UserCog } from 'lucide-react';
 import type { Message } from '../../domain/types';
 import { dispatch, useAppState, isRemoteSession } from '../../domain/store';
 import * as op from '../../domain/operations';
@@ -127,6 +127,7 @@ export function TryStep({ assistant: a, org, stepNumber, nextLabel, onNext, onBa
                     New conversation
                   </Button>
                 )}
+                {chat.messages.length > 0 && <Button size="sm" variant="ghost" icon={<Trash2 size={15} />} disabled={chat.pending} aria-label="Clear chat" onClick={() => { chat.reset(); setInspect(null); }}>Clear chat</Button>}
               </span>
             </div>
           }

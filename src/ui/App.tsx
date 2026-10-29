@@ -16,6 +16,7 @@ import { hasUnpublishedChanges } from '../domain/publish';
 import { Redirect, match, navigate, usePath } from './router';
 import { BrandMark, Button, Notice, Toasts } from './components/ui';
 import { Avatar } from './components/avatar';
+import { suggestedQuestions } from './chat/suggestions';
 export { Avatar, AvatarGlyph, AVATAR_KEYS } from './components/avatar';
 const Landing = lazy(() => import('./screens/Landing').then(module => ({ default: module.Landing })));
 const AuthScreen = lazy(() => import('./screens/Auth').then(module => ({ default: module.AuthScreen })));
@@ -275,6 +276,7 @@ export function ProjectShell({ a, org, current, children }: { a: Assistant; org:
         </>
       }
     >
+      <ProjectQuestionBar a={a} />
       {hasUnpublishedChanges(a) && a.status === 'live' && current !== 'publish' && (
         <div className="banner-wrap">
           <div className="banner" style={{ padding: '12px 40px' }}>
@@ -293,6 +295,15 @@ export function ProjectShell({ a, org, current, children }: { a: Assistant; org:
       </main>
     </AppFrame>
   );
+}
+
+function ProjectQuestionBar({ a }: { a: Assistant }) {
+  const questions = suggestedQuestions(a.draft.sources, a.draft.faqs, a.isSample, 3);
+  if (!questions.length) return null;
+  return <aside className="project-question-bar" aria-label="Suggested questions from your sources">
+    <strong>Ask about your sources</strong>
+    <div>{questions.map(question => <button type="button" key={question} onClick={() => navigate(projectPath(a.id, 'try') + `?question=${encodeURIComponent(question)}`)}>{question}</button>)}</div>
+  </aside>;
 }
 
 function StepPage({ a, org, step }: { a: Assistant; org: Organisation; step: StepId }) {
